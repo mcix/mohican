@@ -151,7 +151,7 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
     }
 
     private Position parsePosition(Object object) {
-        LinkedHashMap<String, Double> val = (LinkedHashMap<String, Double>) object.getValue();
+        LinkedHashMap<String, Double> val = (LinkedHashMap<String, Double>) object;
         return Position.builder().x(new BigDecimal(val.get("x"))).y(new BigDecimal(val.get("y"))).build();
     }
 
