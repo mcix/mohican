@@ -63,6 +63,11 @@ public class WebSocketEventListener {
         handleOnDisconnect();
     }
 
+    @RequestMapping(value = "/", method = RequestMethod.GET)
+    public ResponseEntity test() {
+        return ResponseEntity.ok("Certificate OK");
+    }
+
     @RequestMapping(value = "/mohicanreq", method = RequestMethod.POST)
     public ResponseEntity mohican(final HttpServletRequest request, @RequestBody ReduxAction action) throws Exception {
 

@@ -50,7 +50,7 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
 
         intiDeltaProtoDriver();
 
-        erosController.reInitialize();
+
     }
 
     private void initUI() {
@@ -126,6 +126,8 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
             };
 
             erosController = new DeltaProtoDriver(Configuration.getInstance().getTeknicPort(), encoderListenerX, encoderListenerY);
+
+            erosController.reInitialize();
         }
 
     }

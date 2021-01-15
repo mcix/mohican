@@ -6,6 +6,8 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 
+import static nl.bytesoflife.mohican.spring.WebSocketConfiguration.allowedOrigins;
+
 @Configuration
 public class SpringWebSecurity {
     @Bean
@@ -15,7 +17,7 @@ public class SpringWebSecurity {
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
                         .allowedMethods("*")
-                        .allowedOrigins("http://localhost:3000", "http://deltaproto.com", "https://deltaproto.com","http://192.168.1.132:3000");
+                        .allowedOrigins(allowedOrigins);
             }
         };
     }
