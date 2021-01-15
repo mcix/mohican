@@ -49,6 +49,8 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
         initUI();
 
         intiDeltaProtoDriver();
+
+        erosController.reInitialize();
     }
 
     private void initUI() {
@@ -68,12 +70,12 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
         postionLabelX = new JLabel();
         postionLabelX.setHorizontalAlignment(4);
         postionLabelX.setHorizontalTextPosition(0);
-        postionLabelX.setText("11.0");
+        postionLabelX.setText("0.0");
 
         postionLabelY = new JLabel();
         postionLabelY.setHorizontalAlignment(4);
         postionLabelY.setHorizontalTextPosition(0);
-        postionLabelY.setText("13,1");
+        postionLabelY.setText("0.0");
 
         createLayout(quitButton, messageButton);
         createLayout(postionLabelX, postionLabelY);
@@ -84,12 +86,15 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
         setDefaultCloseOperation(EXIT_ON_CLOSE);
     }
 
+    BigDecimal toMMx;
+    BigDecimal toMMy;
+
     private void intiDeltaProtoDriver() {
         if (Configuration.getInstance().getTeknicPort() != null) {
 
             DecimalFormat df = new DecimalFormat();
-            BigDecimal toMMx = Configuration.getInstance().getposToMMx();
-            BigDecimal toMMy = Configuration.getInstance().getposToMMy();
+            toMMx = Configuration.getInstance().getposToMMx();
+            toMMy = Configuration.getInstance().getposToMMy();
 
             EncoderListener encoderListenerX = new EncoderListener() {
                 public void newPos(int value) {
@@ -261,12 +266,19 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
     void sendPosition() {
         logger.info("Send position via websocket");
 
-        BigDecimal currentX = new BigDecimal(postionLabelX.getText().replace(',', '.'));
-        BigDecimal currentY = new BigDecimal(postionLabelY.getText().replace(',', '.'));
+        int xi = ((DeltaProtoDriver) erosController).getPosX();
+        int yi = ((DeltaProtoDriver) erosController).getPosY();
+
+        BigDecimal x = new BigDecimal(xi).multiply(toMMx);
+        BigDecimal y = new BigDecimal(yi).multiply(toMMy);
+
+
+        //BigDecimal currentX = new BigDecimal(postionLabelX.getText().replace(',', '.'));
+        //BigDecimal currentY = new BigDecimal(postionLabelY.getText().replace(',', '.'));
 
         ReduxAction reduxAction= new ReduxAction();
         reduxAction.setType("MOHICAN_POSITION");
-        reduxAction.setValue( Position.builder().x(currentX).y(currentY).build() );
+        reduxAction.setValue( Position.builder().x(x).y(y).build() );
 
         if( websocket != null ) {
             websocket.convertAndSend(WebSocketConfiguration.MESSAGE_PREFIX + "/mohican/", reduxAction);

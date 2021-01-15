@@ -15,7 +15,7 @@ public class SpringWebSecurity {
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
                         .allowedMethods("*")
-                        .allowedOrigins("http://localhost:3000", "http://deltaproto.com", "https://deltaproto.com");
+                        .allowedOrigins("http://localhost:3000", "http://deltaproto.com", "https://deltaproto.com","http://192.168.1.132:3000");
             }
         };
     }

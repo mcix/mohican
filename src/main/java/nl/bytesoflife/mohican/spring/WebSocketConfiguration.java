@@ -14,7 +14,7 @@ public class WebSocketConfiguration extends AbstractWebSocketMessageBrokerConfig
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/mohican").setAllowedOrigins("http://localhost:3000","https://deltaproto.com","https://www.deltaproto.com").withSockJS().setWebSocketEnabled(true);
+        registry.addEndpoint("/mohican").setAllowedOrigins("http://localhost:3000","https://deltaproto.com","https://www.deltaproto.com","http://192.168.1.132:3000").withSockJS().setWebSocketEnabled(true);
     }
 
     @Override
