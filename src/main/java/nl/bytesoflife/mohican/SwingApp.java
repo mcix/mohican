@@ -55,9 +55,8 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
 
     }
 
-    private void initUI() {
-
-        Image img = getToolkit().getImage(getClass().getResource("/logo.png"));
+    private void setImage(boolean on) {
+        Image img = getToolkit().getImage(getClass().getResource(on ? "/logo_on.png" : "/logo.png"));
 
         if( OSValidator.isMac() ) {
             com.apple.eawt.Application macApp = com.apple.eawt.Application.getApplication();
@@ -65,6 +64,13 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
                 macApp.setDockIconImage(img);
             }
         }
+
+        setIconImage(img);
+    }
+
+    private void initUI() {
+
+        setImage(false);
 
         JButton quitButton = new JButton("Quit");
 
@@ -95,7 +101,7 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
         setTitle("Mohican [DISCONNECTED]");
         setSize(300, 90);
         setLocationRelativeTo(null);
-        setIconImage(img);
+
         setDefaultCloseOperation(EXIT_ON_CLOSE);
     }
 
@@ -218,6 +224,8 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
         logger.info("onConnect");
         setTitle("Mohican [CONNECTED]");
 
+        setImage(true);
+
         messageButton.setEnabled( true );
     }
 
@@ -225,6 +233,8 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
     public void onDisconnect() {
         logger.info("onDisconnect");
         setTitle("Mohican [DISCONNECTED]");
+
+        setImage(false);
 
         if( executor != null ) {
             executor.shutdown();
