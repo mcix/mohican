@@ -2,7 +2,9 @@ package nl.bytesoflife.mohican;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.net.URL;
 import java.text.DecimalFormat;
 import java.util.LinkedHashMap;
 import java.util.concurrent.Executors;
@@ -55,6 +57,15 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
 
     private void initUI() {
 
+        Image img = getToolkit().getImage(getClass().getResource("/logo.png"));
+
+        if( OSValidator.isMac() ) {
+            com.apple.eawt.Application macApp = com.apple.eawt.Application.getApplication();
+            if (macApp != null) {
+                macApp.setDockIconImage(img);
+            }
+        }
+
         JButton quitButton = new JButton("Quit");
 
         quitButton.addActionListener((ActionEvent event) -> {
@@ -77,12 +88,14 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
         postionLabelY.setHorizontalTextPosition(0);
         postionLabelY.setText("0.0");
 
-        createLayout(quitButton, messageButton);
+        //createLayout(quitButton, messageButton);
+        createLayout(quitButton);
         createLayout(postionLabelX, postionLabelY);
 
         setTitle("Mohican [DISCONNECTED]");
-        setSize(300, 70);
+        setSize(300, 90);
         setLocationRelativeTo(null);
+        setIconImage(img);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
     }
 
@@ -268,15 +281,16 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
     void sendPosition() {
         logger.info("Send position via websocket");
 
-        int xi = ((DeltaProtoDriver) erosController).getPosX();
-        int yi = ((DeltaProtoDriver) erosController).getPosY();
+        BigDecimal x = BigDecimal.valueOf(0);
+        BigDecimal y = BigDecimal.valueOf(0);
 
-        BigDecimal x = new BigDecimal(xi).multiply(toMMx);
-        BigDecimal y = new BigDecimal(yi).multiply(toMMy);
+        if( erosController != null ) {
+            int xi = ((DeltaProtoDriver) erosController).getPosX();
+            int yi = ((DeltaProtoDriver) erosController).getPosY();
 
-
-        //BigDecimal currentX = new BigDecimal(postionLabelX.getText().replace(',', '.'));
-        //BigDecimal currentY = new BigDecimal(postionLabelY.getText().replace(',', '.'));
+            x = new BigDecimal(xi).multiply(toMMx);
+            y = new BigDecimal(yi).multiply(toMMy);
+        }
 
         ReduxAction reduxAction= new ReduxAction();
         reduxAction.setType("MOHICAN_POSITION");
