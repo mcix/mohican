@@ -112,16 +112,16 @@ public class DeltaProtoDriver implements ErosController {
 
     public void goTo(Integer posX, Integer posY) {
 
-        encoderListenerX.newPos( posX - pcbZeroX );
-        encoderListenerY.newPos( posY - pcbZeroY );
+        //encoderListenerX.newPos( posX - pcbZeroX );
+        //encoderListenerY.newPos( posY - pcbZeroY );
 
         moveTo(p, posX, posY, getAccByPercentage(acceleration), getVelByPercentage(speed), FALSE);
     }
 
     public void goToPcb(Integer posX, Integer posY) {
 
-        encoderListenerX.newPos( posX );
-        encoderListenerY.newPos( posY );
+        //encoderListenerX.newPos( posX );
+        //encoderListenerY.newPos( posY );
 
         moveTo(p, pcbZeroX + posX, pcbZeroY + posY, getAccByPercentage(acceleration), getVelByPercentage(speed), FALSE);
     }

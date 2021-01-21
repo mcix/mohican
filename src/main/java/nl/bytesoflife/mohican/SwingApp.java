@@ -181,6 +181,11 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
         return Position.builder().x(new BigDecimal(val.get("x"))).y(new BigDecimal(val.get("y"))).build();
     }
 
+    private Integer parseIntValue(Object object) {
+        LinkedHashMap<String, Integer> val = (LinkedHashMap<String, Integer>) object;
+        return val.get("value");
+    }
+
     @Override
     public void onMessage(ReduxAction action) {
         logger.info("onMessage" + action.getType());
@@ -211,6 +216,25 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
                     erosController.goTo(intPosition.getX(), intPosition.getY());
                     break;
                 }
+                case "SET_PCB_POSITION": {
+                    sendPosition("MOHICAN_PCB_POSITION");
+                    break;
+                }
+                case "SET_PLANKJE_POSITION": {
+                    sendPosition("MOHICAN_PLANKJE_POSITION");
+                    break;
+                }
+                case "SET_ACCELERATION": {
+                    Integer value = parseIntValue(action.getValue());
+                    erosController.setAccelerationInPercentage(value);
+                    break;
+                }
+                case "SET_SPEED": {
+                    Integer value = parseIntValue(action.getValue());
+                    erosController.setSpeedInPercentage(value);
+                    break;
+                }
+
             }
 
         }
@@ -289,6 +313,10 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
     }
 
     void sendPosition() {
+        sendPosition("MOHICAN_POSITION");
+    }
+
+    void sendPosition(String type) {
         logger.info("Send position via websocket");
 
         BigDecimal x = BigDecimal.valueOf(0);
@@ -303,7 +331,7 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
         }
 
         ReduxAction reduxAction= new ReduxAction();
-        reduxAction.setType("MOHICAN_POSITION");
+        reduxAction.setType(type);
         reduxAction.setValue( Position.builder().x(x).y(y).build() );
 
         if( websocket != null ) {
