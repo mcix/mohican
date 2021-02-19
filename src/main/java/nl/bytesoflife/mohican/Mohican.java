@@ -2,9 +2,7 @@ package nl.bytesoflife.mohican;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.io.InputStream;
 import java.math.BigDecimal;
-import java.net.URL;
 import java.text.DecimalFormat;
 import java.util.LinkedHashMap;
 import java.util.concurrent.Executors;
@@ -29,9 +27,51 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 @SpringBootApplication
-public class SwingApp extends JFrame implements ReduxEventListener, InitializingBean, Runnable {
+public class Mohican extends JFrame implements ReduxEventListener, InitializingBean, Runnable {
 
-    private static final Logger logger = LoggerFactory.getLogger(SwingApp.class);
+    {
+        setupOSX();
+    }
+
+    static void setupOSX() {
+        if( !OSValidator.isMac() ) {
+            return;
+        }
+        //log.debug("Setting up OSX UI Elements");
+        try {
+            // Put the menu bar at the top of the screen
+            System.setProperty("apple.laf.useScreenMenuBar", "true");
+            // Set the name in the menu
+            System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Mohican");
+
+            // This line must come AFTER the above properties are set, otherwise
+            // the name will not appear
+            final com.apple.eawt.Application osxApp = com.apple.eawt.Application.getApplication();
+            if (osxApp == null) {
+                // setup.
+                throw new NullPointerException("com.apple.eawt.Application.getApplication() returned NULL. " + "Aborting OSX UI Setup.");
+            }
+            // Set handlers
+            osxApp.setQuitHandler((quitEvent, quitResponse) -> {
+                System.exit(0);
+            });
+            //osxApp.setAboutHandler(ah);
+            //osxApp.setPreferencesHandler(ph);
+            // Set the dock icon to the largest icon
+            //final Image dockIcon = Toolkit.getDefaultToolkit().getImage(SwingStartup.class.getResource(ICON_RSRC));
+            //osxApp.setDockIconImage(dockIcon);
+
+            final Image dockIcon = Toolkit.getDefaultToolkit().getImage(Mohican.class.getResource("/logo.png"));
+
+            osxApp.setDockIconImage(dockIcon);
+            osxApp.setDockIconBadge("Mohican");
+
+        } catch (final Throwable t) {
+            //log.warn("Error setting up OSX UI:", t);
+        }
+    }
+
+    private static final Logger logger = LoggerFactory.getLogger(Mohican.class);
 
     @Autowired
     private SimpMessagingTemplate websocket;
@@ -44,26 +84,21 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
     private JLabel postionLabelX;
     private JLabel postionLabelY;
 
+    private JSlider sliderX;
+    private JSlider sliderY;
+    private static Integer sliderMaxY = 34500;
+    private static Integer sliderMaxX = 61600;
+    private static Integer sliderDivider = 100;
+
     private DeltaProtoDriver erosController;
 
-    public SwingApp() {
-
+    public Mohican() {
         initUI();
-
         intiDeltaProtoDriver();
-
-
     }
 
     private void setImage(boolean on) {
         Image img = getToolkit().getImage(getClass().getResource(on ? "/logo_on.png" : "/logo.png"));
-
-        if( OSValidator.isMac() ) {
-            com.apple.eawt.Application macApp = com.apple.eawt.Application.getApplication();
-            if (macApp != null) {
-                macApp.setDockIconImage(img);
-            }
-        }
 
         setIconImage(img);
     }
@@ -97,6 +132,31 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
         //createLayout(quitButton, messageButton);
         createLayout(quitButton);
         createLayout(postionLabelX, postionLabelY);
+
+        if (Configuration.getInstance().getTeknicPort() == null) {
+            DecimalFormat df = new DecimalFormat();
+            sliderX = new JSlider( 0, sliderMaxX, 0);
+            sliderY = new JSlider(JSlider.VERTICAL, 0, sliderMaxY, 0);
+
+            sliderX.addChangeListener(e -> {
+                String val = df.format(new BigDecimal(sliderX.getValue()).divide(BigDecimal.valueOf(sliderDivider)));
+
+                postionLabelX.setText("X " + val);
+                postionLabelX.paintImmediately(postionLabelX.getVisibleRect());
+            });
+
+            sliderY.addChangeListener(e -> {
+                String val = df.format(new BigDecimal((sliderY.getValue())).divide(BigDecimal.valueOf(sliderDivider)));
+
+                postionLabelY.setText("Y " + val);
+                postionLabelY.paintImmediately(postionLabelY.getVisibleRect());
+            });
+
+            Container pane = getContentPane();
+            pane.add(sliderY);
+            pane.add(sliderX);
+
+        }
 
         setTitle("Mohican [DISCONNECTED]");
         setSize(300, 90);
@@ -167,11 +227,11 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
 
     public static void main(String[] args) {
 
-        ConfigurableApplicationContext ctx = new SpringApplicationBuilder(SwingApp.class)
+        ConfigurableApplicationContext ctx = new SpringApplicationBuilder(Mohican.class)
                 .headless(false).run(args);
 
         EventQueue.invokeLater(() -> {
-            SwingApp ex = ctx.getBean(SwingApp.class);
+            Mohican ex = ctx.getBean(Mohican.class);
             ex.setVisible(true);
         });
     }
@@ -214,6 +274,7 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
                     Position pos = parsePosition(action.getValue());
                     IntPosition intPosition = pos.getInt();
                     erosController.goTo(intPosition.getX(), intPosition.getY());
+                    erosController.disableBrake();
                     break;
                 }
                 case "SET_PCB_POSITION": {
@@ -328,6 +389,9 @@ public class SwingApp extends JFrame implements ReduxEventListener, Initializing
 
             x = new BigDecimal(xi).multiply(toMMx);
             y = new BigDecimal(yi).multiply(toMMy);
+        } else {
+            x = new BigDecimal(sliderX.getValue()).divide(BigDecimal.valueOf(sliderDivider));
+            y = new BigDecimal((sliderY.getValue())).divide(BigDecimal.valueOf(sliderDivider));
         }
 
         ReduxAction reduxAction= new ReduxAction();
