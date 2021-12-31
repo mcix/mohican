@@ -12,9 +12,7 @@ import javax.swing.*;
 
 import lombok.Builder;
 import lombok.Data;
-import nl.bytesoflife.Configuration;
-import nl.bytesoflife.DeltaProtoDriver;
-import nl.bytesoflife.EncoderListener;
+import nl.bytesoflife.*;
 import nl.bytesoflife.mohican.spring.WebSocketConfiguration;
 import nl.bytesoflife.mohican.spring.WebSocketEventListener;
 import org.slf4j.Logger;
@@ -90,7 +88,7 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
     private static Integer sliderMaxX = 61600;
     private static Integer sliderDivider = 100;
 
-    private DeltaProtoDriver erosController;
+    private ErosController erosController;
 
     public Mohican() {
         initUI();
@@ -133,7 +131,7 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
         createLayout(quitButton);
         createLayout(postionLabelX, postionLabelY);
 
-        if (Configuration.getInstance().getTeknicPort() == null) {
+        if (Configuration.getInstance().getTeknicPort() == null && Configuration.getInstance().getPortX() == null) {
             DecimalFormat df = new DecimalFormat();
             sliderX = new JSlider( 0, sliderMaxX, 0);
             sliderY = new JSlider(JSlider.VERTICAL, 0, sliderMaxY, 0);
@@ -169,7 +167,7 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
     BigDecimal toMMy;
 
     private void intiDeltaProtoDriver() {
-        if (Configuration.getInstance().getTeknicPort() != null) {
+        //if (Configuration.getInstance().getTeknicPort() != null) {
 
             DecimalFormat df = new DecimalFormat();
             toMMx = Configuration.getInstance().getposToMMx();
@@ -203,10 +201,22 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
                     });
                 }
             };
+        //}
+
+        if (Configuration.getInstance().getTeknicPort() != null) {
+
+
+            toMMx = Configuration.getInstance().getposToMMx();
+            toMMy = Configuration.getInstance().getposToMMy();
 
             erosController = new DeltaProtoDriver(Configuration.getInstance().getTeknicPort(), encoderListenerX, encoderListenerY);
 
             erosController.reInitialize();
+        } else if( Configuration.getInstance().getPortX() != null ) {
+
+            erosController = new ErosControllerImpl(encoderListenerX, encoderListenerY);
+            erosController.reInitialize();
+
         }
 
     }
@@ -236,9 +246,24 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
         });
     }
 
+    private BigDecimal getNumber(Object value) {
+        if( value instanceof String ) {
+
+            return BigDecimal.valueOf(Double.parseDouble((String) value));
+
+        } else if( value instanceof Integer ) {
+
+            return BigDecimal.valueOf(Double.parseDouble(String.valueOf((Integer) value)));
+
+        } else {
+            return BigDecimal.valueOf((Double) value);
+        }
+    }
+
     private Position parsePosition(Object object) {
-        LinkedHashMap<String, Double> val = (LinkedHashMap<String, Double>) object;
-        return Position.builder().x(new BigDecimal(val.get("x"))).y(new BigDecimal(val.get("y"))).build();
+        LinkedHashMap<String, Object> val = (LinkedHashMap<String, Object>) object;
+
+        return Position.builder().x(getNumber(val.get("x"))).y(getNumber(val.get("y"))).build();
     }
 
     private Integer parseIntValue(Object object) {
@@ -274,7 +299,7 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
                     Position pos = parsePosition(action.getValue());
                     IntPosition intPosition = pos.getInt();
                     erosController.goTo(intPosition.getX(), intPosition.getY());
-                    erosController.disableBrake();
+                    //erosController.disableBrake();
                     break;
                 }
                 case "SET_PCB_POSITION": {
@@ -293,6 +318,10 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
                 case "SET_SPEED": {
                     Integer value = parseIntValue(action.getValue());
                     erosController.setSpeedInPercentage(value);
+                    break;
+                }
+                case "ZERO": {
+                    erosController.setZero();
                     break;
                 }
 
@@ -384,11 +413,14 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
         BigDecimal y = BigDecimal.valueOf(0);
 
         if( erosController != null ) {
-            int xi = ((DeltaProtoDriver) erosController).getPosX();
-            int yi = ((DeltaProtoDriver) erosController).getPosY();
+            //int xi = ((DeltaProtoDriver) erosController).getPosX();
+            //int yi = ((DeltaProtoDriver) erosController).getPosY();
 
-            x = new BigDecimal(xi).multiply(toMMx);
-            y = new BigDecimal(yi).multiply(toMMy);
+            String xi = postionLabelX.getText();
+            String yi = postionLabelY.getText();
+
+            x = new BigDecimal(xi);
+            y = new BigDecimal(yi);
         } else {
             x = new BigDecimal(sliderX.getValue()).divide(BigDecimal.valueOf(sliderDivider));
             y = new BigDecimal((sliderY.getValue())).divide(BigDecimal.valueOf(sliderDivider));
