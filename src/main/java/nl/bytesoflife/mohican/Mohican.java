@@ -407,7 +407,7 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
     }
 
     void sendPosition(String type) {
-        logger.info("Send position via websocket");
+        //logger.info("Send position via websocket");
 
         BigDecimal x = BigDecimal.valueOf(0);
         BigDecimal y = BigDecimal.valueOf(0);
@@ -416,6 +416,7 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
             //int xi = ((DeltaProtoDriver) erosController).getPosX();
             //int yi = ((DeltaProtoDriver) erosController).getPosY();
 
+            //todo: test this
             String xi = postionLabelX.getText();
             String yi = postionLabelY.getText();
 

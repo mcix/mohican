@@ -60,7 +60,7 @@ public class MotorController extends Thread
             {
                 String value = port.readString();
 
-                System.out.println(value);
+                //System.out.println(value);
 
                 try {
                     Integer pos = Integer.parseInt(value.replace("\r", ""));
@@ -121,7 +121,7 @@ public class MotorController extends Thread
 
     private void fireNewPosition(int value)
     {
-        System.out.println("MotorController.fireNewPosition " + value);
+        //System.out.println("MotorController.fireNewPosition " + value);
 
         for (EncoderListener listener : listeners)
         {
