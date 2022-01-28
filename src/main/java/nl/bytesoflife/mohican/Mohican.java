@@ -62,7 +62,7 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
             final Image dockIcon = Toolkit.getDefaultToolkit().getImage(Mohican.class.getResource("/logo.png"));
 
             osxApp.setDockIconImage(dockIcon);
-            osxApp.setDockIconBadge("Mohican");
+            //osxApp.setDockIconBadge("Mohican");
 
         } catch (final Throwable t) {
             //log.warn("Error setting up OSX UI:", t);
@@ -273,7 +273,7 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
 
     @Override
     public void onMessage(ReduxAction action) {
-        logger.info("onMessage" + action.getType());
+        logger.info("onMessage " + action.getType());
 
         try {
 
@@ -365,6 +365,8 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
 
     private void setPositionTimeOut(Integer ms) {
 
+        logger.info("setPositionTimeOut " + ms);
+
         if( executor != null ) {
             executor.shutdown();
         }
@@ -407,7 +409,6 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
     }
 
     void sendPosition(String type) {
-        //logger.info("Send position via websocket");
 
         BigDecimal x = BigDecimal.valueOf(0);
         BigDecimal y = BigDecimal.valueOf(0);
@@ -417,8 +418,8 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
             //int yi = ((DeltaProtoDriver) erosController).getPosY();
 
             //todo: test this
-            String xi = postionLabelX.getText();
-            String yi = postionLabelY.getText();
+            String xi = postionLabelX.getText().replace(",", ".");
+            String yi = postionLabelY.getText().replace(",", ".");
 
             x = new BigDecimal(xi);
             y = new BigDecimal(yi);
