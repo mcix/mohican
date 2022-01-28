@@ -155,7 +155,7 @@ public class MotorController extends Thread
     {
         pos= inverted ? -pos : pos;
 
-        if( pos > 0 && pos <= 5500 ) {
+        if( pos > 0 && pos <= 6000 ) {
 
             //String value = "moveto " + pos + " " + defaultAcceleration + " " + defaultDeceleration + " " + defaultSpeed + "\n";
             String value = "m " + pos+ "\n";
