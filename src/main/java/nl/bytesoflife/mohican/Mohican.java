@@ -1,14 +1,12 @@
 package nl.bytesoflife.mohican;
 
 import java.awt.*;
-import java.awt.event.ActionEvent;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.util.LinkedHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import javax.swing.*;
 
 import lombok.Builder;
 import lombok.Data;
@@ -19,55 +17,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 @SpringBootApplication
-public class Mohican extends JFrame implements ReduxEventListener, InitializingBean, Runnable {
-
-    {
-        setupOSX();
-    }
-
-    static void setupOSX() {
-        if( !OSValidator.isMac() ) {
-            return;
-        }
-        //log.debug("Setting up OSX UI Elements");
-        try {
-            // Put the menu bar at the top of the screen
-            System.setProperty("apple.laf.useScreenMenuBar", "true");
-            // Set the name in the menu
-            System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Mohican");
-
-            // This line must come AFTER the above properties are set, otherwise
-            // the name will not appear
-            final com.apple.eawt.Application osxApp = com.apple.eawt.Application.getApplication();
-            if (osxApp == null) {
-                // setup.
-                throw new NullPointerException("com.apple.eawt.Application.getApplication() returned NULL. " + "Aborting OSX UI Setup.");
-            }
-            // Set handlers
-            osxApp.setQuitHandler((quitEvent, quitResponse) -> {
-                System.exit(0);
-            });
-            //osxApp.setAboutHandler(ah);
-            //osxApp.setPreferencesHandler(ph);
-            // Set the dock icon to the largest icon
-            //final Image dockIcon = Toolkit.getDefaultToolkit().getImage(SwingStartup.class.getResource(ICON_RSRC));
-            //osxApp.setDockIconImage(dockIcon);
-
-            final Image dockIcon = Toolkit.getDefaultToolkit().getImage(Mohican.class.getResource("/logo.png"));
-
-            osxApp.setDockIconImage(dockIcon);
-            //osxApp.setDockIconBadge("Mohican");
-
-        } catch (final Throwable t) {
-            //log.warn("Error setting up OSX UI:", t);
-        }
-    }
+public class Mohican implements ReduxEventListener, InitializingBean, Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(Mohican.class);
 
@@ -77,90 +34,47 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
     @Autowired
     private WebSocketEventListener eventListener;
 
-    int posX, posY;
-    private JButton messageButton;
-    private JLabel postionLabelX;
-    private JLabel postionLabelY;
+    private MohicanFrame mohicanFrame;
 
-    private JSlider sliderX;
-    private JSlider sliderY;
-    private static Integer sliderMaxY = 34500;
-    private static Integer sliderMaxX = 61600;
-    private static Integer sliderDivider = 100;
+    int posX, posY;
+
+    private String positionX;
+    private String positionY;
 
     private ErosController erosController;
 
     public Mohican() {
-        initUI();
         intiDeltaProtoDriver();
     }
 
-    private void setImage(boolean on) {
-        Image img = getToolkit().getImage(getClass().getResource(on ? "/logo_on.png" : "/logo.png"));
+    @Autowired
+    public Mohican(ApplicationArguments args) {
 
-        setIconImage(img);
-    }
+        boolean headless = false;
 
-    private void initUI() {
-
-        setImage(false);
-
-        JButton quitButton = new JButton("Quit");
-
-        quitButton.addActionListener((ActionEvent event) -> {
-            System.exit(0);
-        });
-
-        messageButton = new JButton("Send position");
-        messageButton.setEnabled( false );
-        messageButton.addActionListener((ActionEvent event) -> {
-            sendPosition();
-        });
-
-        postionLabelX = new JLabel();
-        postionLabelX.setHorizontalAlignment(4);
-        postionLabelX.setHorizontalTextPosition(0);
-        postionLabelX.setText("0.0");
-
-        postionLabelY = new JLabel();
-        postionLabelY.setHorizontalAlignment(4);
-        postionLabelY.setHorizontalTextPosition(0);
-        postionLabelY.setText("0.0");
-
-        //createLayout(quitButton, messageButton);
-        createLayout(quitButton);
-        createLayout(postionLabelX, postionLabelY);
-
-        if (Configuration.getInstance().getTeknicPort() == null && Configuration.getInstance().getPortX() == null) {
-            DecimalFormat df = new DecimalFormat();
-            sliderX = new JSlider( 0, sliderMaxX, 0);
-            sliderY = new JSlider(JSlider.VERTICAL, 0, sliderMaxY, 0);
-
-            sliderX.addChangeListener(e -> {
-                String val = df.format(new BigDecimal(sliderX.getValue()).divide(BigDecimal.valueOf(sliderDivider)));
-
-                postionLabelX.setText("X " + val);
-                postionLabelX.paintImmediately(postionLabelX.getVisibleRect());
-            });
-
-            sliderY.addChangeListener(e -> {
-                String val = df.format(new BigDecimal((sliderY.getValue())).divide(BigDecimal.valueOf(sliderDivider)));
-
-                postionLabelY.setText("Y " + val);
-                postionLabelY.paintImmediately(postionLabelY.getVisibleRect());
-            });
-
-            Container pane = getContentPane();
-            pane.add(sliderY);
-            pane.add(sliderX);
-
+        for (String sourceArg : args.getSourceArgs()) {
+            switch (sourceArg) {
+                case "-h":
+                case "-headless":
+                    headless = true;
+                    break;
+                default:
+                    //stub
+                    break;
+            }
         }
 
-        setTitle("Mohican [DISCONNECTED]");
-        setSize(300, 90);
-        setLocationRelativeTo(null);
+        intiDeltaProtoDriver();
 
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        if( !headless ) {
+            try {
+                mohicanFrame = new MohicanFrame(this);
+            } catch (HeadlessException e) {
+                logger.error("Mohican HeadlessException: Run the application with -h or -headless to run without a UI");
+                logger.error("Mohican HeadlessException: Start de applicatie met -h of -headless om zonder userinterface te draaien");
+                throw e;
+            }
+        }
     }
 
     BigDecimal toMMx;
@@ -176,29 +90,47 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
             EncoderListener encoderListenerX = new EncoderListener() {
                 public void newPos(int value) {
                     posX = new Integer(value);
+                    String val = df.format(toMMx.multiply(new BigDecimal(posX)));
+                    positionX = val;
 
-                    SwingUtilities.invokeLater(new Runnable() {
-                        public void run() {
-                            String val = df.format(toMMx.multiply(new BigDecimal(posX)));
+                    if( mohicanFrame != null ) {
+                        mohicanFrame.setPostionLabelX( val );
+                    }
 
-                            postionLabelX.setText(val);
-                            postionLabelX.paintImmediately(postionLabelX.getVisibleRect());
-                        }
-                    });
+                    /*if( postionLabelX != null ) {
+                        SwingUtilities.invokeLater(new Runnable() {
+                            public void run() {
+                                String val = df.format(toMMx.multiply(new BigDecimal(posX)));
+
+                                postionLabelX.setText(val);
+                                postionLabelX.paintImmediately(postionLabelX.getVisibleRect());
+                                positionX = val;
+                            }
+                        });
+                    }*/
                 }
             };
 
             EncoderListener encoderListenerY = new EncoderListener() {
                 public void newPos(final int value) {
                     posY = new Integer(value);
-                    SwingUtilities.invokeLater(new Runnable() {
-                        public void run() {
-                            String val = df.format(toMMy.multiply(new BigDecimal(posY)));
+                    String val = df.format(toMMy.multiply(new BigDecimal(posY)));
+                    positionY = val;
 
-                            postionLabelY.setText(val);
-                            postionLabelY.paintImmediately(postionLabelY.getVisibleRect());
-                        }
-                    });
+                    if( mohicanFrame != null ) {
+                        mohicanFrame.setPostionLabelY( val );
+                    }
+
+                    /*if( postionLabelY != null ) {
+                        SwingUtilities.invokeLater(new Runnable() {
+                            public void run() {
+                                String val = df.format(toMMy.multiply(new BigDecimal(posY)));
+
+                                postionLabelY.setText(val);
+                                postionLabelY.paintImmediately(postionLabelY.getVisibleRect());
+                            }
+                        });
+                    }*/
                 }
             };
         //}
@@ -221,29 +153,26 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
 
     }
 
-    private void createLayout(JComponent... arg) {
 
-        Container pane = getContentPane();
-
-        FlowLayout layout = new FlowLayout();
-
-        pane.setLayout( layout );
-
-        for (JComponent jComponent : arg) {
-            pane.add( jComponent );
-        }
-
-    }
 
     public static void main(String[] args) {
 
-        ConfigurableApplicationContext ctx = new SpringApplicationBuilder(Mohican.class)
-                .headless(false).run(args);
+        boolean headless = false;
 
-        EventQueue.invokeLater(() -> {
-            Mohican ex = ctx.getBean(Mohican.class);
-            ex.setVisible(true);
-        });
+        for (String arg : args) {
+            switch (arg) {
+                case "-h":
+                case "-headless":
+                    headless = true;
+                    break;
+                default:
+                    //stub
+                    break;
+            }
+        }
+
+        ConfigurableApplicationContext ctx = new SpringApplicationBuilder(Mohican.class)
+                .headless(headless).addCommandLineProperties(true).run(args);
     }
 
     private BigDecimal getNumber(Object value) {
@@ -336,24 +265,24 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
     @Override
     public void onConnect() {
         logger.info("onConnect");
-        setTitle("Mohican [CONNECTED]");
+        //setTitle("Mohican [CONNECTED]");
 
-        setImage(true);
+        //setImage(true);
 
-        messageButton.setEnabled( true );
+        //messageButton.setEnabled( true );
     }
 
     @Override
     public void onDisconnect() {
         logger.info("onDisconnect");
-        setTitle("Mohican [DISCONNECTED]");
+        //setTitle("Mohican [DISCONNECTED]");
 
-        setImage(false);
+        //setImage(false);
 
         if( executor != null ) {
             executor.shutdown();
         }
-        messageButton.setEnabled( false );
+        //messageButton.setEnabled( false );
     }
 
     @Override
@@ -418,14 +347,14 @@ public class Mohican extends JFrame implements ReduxEventListener, InitializingB
             //int yi = ((DeltaProtoDriver) erosController).getPosY();
 
             //todo: test this
-            String xi = postionLabelX.getText().replace(",", ".");
-            String yi = postionLabelY.getText().replace(",", ".");
+            String xi = positionX.replace(",", ".");
+            String yi = positionY.replace(",", ".");
 
             x = new BigDecimal(xi);
             y = new BigDecimal(yi);
         } else {
-            x = new BigDecimal(sliderX.getValue()).divide(BigDecimal.valueOf(sliderDivider));
-            y = new BigDecimal((sliderY.getValue())).divide(BigDecimal.valueOf(sliderDivider));
+            //x = new BigDecimal(sliderX.getValue()).divide(BigDecimal.valueOf(sliderDivider));
+            //y = new BigDecimal((sliderY.getValue())).divide(BigDecimal.valueOf(sliderDivider));
         }
 
         ReduxAction reduxAction= new ReduxAction();
