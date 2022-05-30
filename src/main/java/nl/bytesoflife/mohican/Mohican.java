@@ -24,7 +24,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 @SpringBootApplication
-public class Mohican implements ReduxEventListener, InitializingBean, Runnable {
+public class Mohican implements ReduxEventListener, WebsocketProviderListener, InitializingBean, Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(Mohican.class);
 
@@ -288,6 +288,7 @@ public class Mohican implements ReduxEventListener, InitializingBean, Runnable {
     @Override
     public void afterPropertiesSet() throws Exception {
         eventListener.addReduxEventListener( this );
+        eventListener.addWebsocketProviderListener( this );
     }
 
     ScheduledExecutorService executor = null;
@@ -307,9 +308,27 @@ public class Mohican implements ReduxEventListener, InitializingBean, Runnable {
         }
     }
 
+    @Override
+    public Position getPosition() {
+        BigDecimal x = BigDecimal.valueOf(0);
+        BigDecimal y = BigDecimal.valueOf(0);
+
+        if( erosController != null ) {
+            String xi = positionX.replace(",", ".");
+            String yi = positionY.replace(",", ".");
+
+            x = new BigDecimal(xi);
+            y = new BigDecimal(yi);
+        } else if( mohicanFrame != null ) {
+            x =  mohicanFrame.getPostionLabelX();
+            y =  mohicanFrame.getPostionLabelY();
+        }
+        return Position.builder().x(x).y(y).build();
+    }
+
     @Data
     @Builder
-    static class Position {
+    public static class Position {
         BigDecimal x;
         BigDecimal y;
 
@@ -339,27 +358,11 @@ public class Mohican implements ReduxEventListener, InitializingBean, Runnable {
 
     void sendPosition(String type) {
 
-        BigDecimal x = BigDecimal.valueOf(0);
-        BigDecimal y = BigDecimal.valueOf(0);
-
-        if( erosController != null ) {
-            //int xi = ((DeltaProtoDriver) erosController).getPosX();
-            //int yi = ((DeltaProtoDriver) erosController).getPosY();
-
-            //todo: test this
-            String xi = positionX.replace(",", ".");
-            String yi = positionY.replace(",", ".");
-
-            x = new BigDecimal(xi);
-            y = new BigDecimal(yi);
-        } else {
-            //x = new BigDecimal(sliderX.getValue()).divide(BigDecimal.valueOf(sliderDivider));
-            //y = new BigDecimal((sliderY.getValue())).divide(BigDecimal.valueOf(sliderDivider));
-        }
+        Position position = getPosition();
 
         ReduxAction reduxAction= new ReduxAction();
         reduxAction.setType(type);
-        reduxAction.setValue( Position.builder().x(x).y(y).build() );
+        reduxAction.setValue( position );
 
         if( websocket != null ) {
             websocket.convertAndSend(WebSocketConfiguration.MESSAGE_PREFIX + "/mohican/", reduxAction);

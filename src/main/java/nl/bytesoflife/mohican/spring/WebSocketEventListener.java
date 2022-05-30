@@ -1,13 +1,13 @@
 package nl.bytesoflife.mohican.spring;
 
+import nl.bytesoflife.mohican.Mohican;
 import nl.bytesoflife.mohican.ReduxAction;
 import nl.bytesoflife.mohican.ReduxEventListener;
+import nl.bytesoflife.mohican.WebsocketProviderListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,11 +28,15 @@ public class WebSocketEventListener {
     private static final Logger logger = LoggerFactory.getLogger(WebSocketEventListener.class);
 
     private List<ReduxEventListener> eventListenerList= new ArrayList();
+    private WebsocketProviderListener websocketProviderListener= null;
 
     public void addReduxEventListener(ReduxEventListener listener) {
         eventListenerList.add( listener );
     }
 
+    public void addWebsocketProviderListener(Mohican listener) {
+        websocketProviderListener = listener;
+    }
     private void handleReduxEvent( ReduxAction event ) {
         for (ReduxEventListener reduxEventListener : eventListenerList) {
             reduxEventListener.onMessage( event );
@@ -78,4 +82,15 @@ public class WebSocketEventListener {
         return ResponseEntity.ok("");
     }
 
+    @RequestMapping(value = "/mohicanpos", method = RequestMethod.GET)
+    public Mohican.Position mohicanpos(final HttpServletRequest request) throws Exception {
+
+        logger.info("received a pos request");
+
+        if( websocketProviderListener != null ) {
+            return websocketProviderListener.getPosition();
+        }
+
+        throw new IllegalStateException("Not connected");
+    }
 }

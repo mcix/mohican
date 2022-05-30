@@ -1,7 +1,6 @@
 package nl.bytesoflife.mohican;
 
 import nl.bytesoflife.Configuration;
-import org.springframework.context.ConfigurableApplicationContext;
 
 import javax.swing.*;
 import java.awt.*;
@@ -174,5 +173,13 @@ public class MohicanFrame extends JFrame {
                 postionLabelY.paintImmediately(postionLabelY.getVisibleRect());
             }
         });
+    }
+
+    public BigDecimal getPostionLabelX() {
+        return new BigDecimal(sliderX.getValue()).divide(BigDecimal.valueOf(sliderDivider));
+    }
+
+    public BigDecimal getPostionLabelY() {
+        return new BigDecimal(sliderY.getValue()).divide(BigDecimal.valueOf(sliderDivider));
     }
 }
