@@ -75,7 +75,7 @@ public class WebSocketEventListener {
     @RequestMapping(value = "/mohicanreq", method = RequestMethod.POST)
     public ResponseEntity mohican(final HttpServletRequest request, @RequestBody ReduxAction action) throws Exception {
 
-        logger.info("received a message " + action.getType());
+        //logger.info("received a message " + action.getType());
 
         handleReduxEvent(action);
 
@@ -85,7 +85,7 @@ public class WebSocketEventListener {
     @RequestMapping(value = "/mohicanpos", method = RequestMethod.GET)
     public Mohican.Position mohicanpos(final HttpServletRequest request) throws Exception {
 
-        logger.info("received a pos request");
+        //logger.info("received a pos request");
 
         if( websocketProviderListener != null ) {
             return websocketProviderListener.getPosition();

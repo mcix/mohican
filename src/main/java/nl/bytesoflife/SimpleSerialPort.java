@@ -3,6 +3,7 @@ package nl.bytesoflife;
 import jssc.SerialPort;
 import jssc.SerialPortException;
 import jssc.SerialPortList;
+import jssc.SerialPortTimeoutException;
 import org.apache.poi.util.ArrayUtil;
 
 import java.util.ArrayList;
@@ -10,17 +11,11 @@ import java.util.ArrayList;
 public class SimpleSerialPort {
     SerialPort serialPort;
 
-    public SimpleSerialPort(String port, int baudrate)
-    {
+    public SimpleSerialPort(String port, int baudrate) throws SerialPortException {
         serialPort= new SerialPort(port);
-        try {
-            serialPort.openPort();//Open serial port
-            serialPort.purgePort(0);
-            serialPort.setParams(baudrate, 8, 1, 0);//Set params.
-        }
-        catch (SerialPortException ex) {
-            System.out.println(ex);
-        }
+        serialPort.openPort();//Open serial port
+        serialPort.purgePort(0);
+        serialPort.setParams(baudrate, 8, 1, 0);//Set params.
     }
 
     public void close()
@@ -51,9 +46,8 @@ public class SimpleSerialPort {
         return ports;
     }
 
-    public byte readByte( ) throws SerialPortException
-    {
-        byte[] buffer = serialPort.readBytes(1);
+    public byte readByte( ) throws SerialPortException, SerialPortTimeoutException {
+        byte[] buffer = serialPort.readBytes(1, 1000);
         return buffer[0];
     }
 
@@ -74,8 +68,7 @@ public class SimpleSerialPort {
         serialPort.writeBytes(data);
     }
 
-    public String readString() throws SerialPortException
-    {
+    public String readString() throws SerialPortException, SerialPortTimeoutException {
         byte value= -1;
         int i=0;
         byte[] data= new byte[200];
@@ -96,8 +89,7 @@ public class SimpleSerialPort {
     }
 
 
-    public byte[] readData() throws SerialPortException
-    {
+    public byte[] readData() throws SerialPortException, SerialPortTimeoutException {
         byte value= -1;
         int i=0;
         byte[] data= new byte[200];

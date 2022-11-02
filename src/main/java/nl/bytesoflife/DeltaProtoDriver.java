@@ -1,8 +1,12 @@
 package nl.bytesoflife;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import static java.lang.Thread.sleep;
 
-public class DeltaProtoDriver implements ErosController {
+public class DeltaProtoDriver implements ErosController, Runnable {
 
     static {
         System.out.println(System.getProperty("java.library.path"));
@@ -78,6 +82,10 @@ public class DeltaProtoDriver implements ErosController {
 
         encoderListenerX.newPos( 0 );
         encoderListenerY.newPos( 0 );
+
+        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+
+        executor.scheduleWithFixedDelay(this, 0, 50, TimeUnit.MILLISECONDS);
     }
 
     public void closePorts() {
@@ -94,18 +102,18 @@ public class DeltaProtoDriver implements ErosController {
         pcbZeroX= currentx - x;
         pcbZeroY= currenty - y;
 
-        System.out.println("DeltaProtoDriver.setPcbPosition x " +pcbZeroX);
-        System.out.println("DeltaProtoDriver.setPcbPosition y " +pcbZeroY);
+        //System.out.println("DeltaProtoDriver.setPcbPosition x " +pcbZeroX);
+        //System.out.println("DeltaProtoDriver.setPcbPosition y " +pcbZeroY);
     }
 
     public void setZero() {
-        System.out.println("DeltaProtoDriver.setZero");
+        //System.out.println("DeltaProtoDriver.setZero");
 
         setPcbPosition(0, 0);
     }
 
     public void setPosition(Integer posX, Integer posY) {
-        System.out.println("DeltaProtoDriver.setPosition " + posX + " " + posY);
+        //System.out.println("DeltaProtoDriver.setPosition " + posX + " " + posY);
 
         setPcbPosition( posX, posY);
     }
@@ -115,7 +123,7 @@ public class DeltaProtoDriver implements ErosController {
         //encoderListenerX.newPos( posX - pcbZeroX );
         //encoderListenerY.newPos( posY - pcbZeroY );
 
-        moveTo(p, posX, posY, getAccByPercentage(acceleration), getVelByPercentage(speed), FALSE);
+        moveTo(p, posX, posY, getAccByPercentage(acceleration), getVelByPercentage(speed), TRUE);
     }
 
     public void goToPcb(Integer posX, Integer posY) {
@@ -123,7 +131,7 @@ public class DeltaProtoDriver implements ErosController {
         //encoderListenerX.newPos( posX );
         //encoderListenerY.newPos( posY );
 
-        moveTo(p, pcbZeroX + posX, pcbZeroY + posY, getAccByPercentage(acceleration), getVelByPercentage(speed), FALSE);
+        moveTo(p, pcbZeroX + posX, pcbZeroY + posY, getAccByPercentage(acceleration), getVelByPercentage(speed), TRUE);
     }
 
     public void goTo(final Integer posX, final Integer posY, final Integer delayX, final Integer delayY) {
@@ -140,7 +148,7 @@ public class DeltaProtoDriver implements ErosController {
                     else {
                         sleep(delayY);
                     }
-                    moveTo(p, pcbZeroX + posX, pcbZeroY + posY, getAccByPercentage(acceleration), getVelByPercentage(speed), FALSE);
+                    moveTo(p, pcbZeroX + posX, pcbZeroY + posY, getAccByPercentage(acceleration), getVelByPercentage(speed), TRUE);
                 }
                 catch( InterruptedException e )
                 {
@@ -160,7 +168,7 @@ public class DeltaProtoDriver implements ErosController {
     }
 
     public void moveY(int i) {
-        System.out.println("TeknicController.moveY " + i);
+        //System.out.println("TeknicController.moveY " + i);
 
         Double doublex= getPositionX(p);
         Double doubley= getPositionY(p);
@@ -171,11 +179,11 @@ public class DeltaProtoDriver implements ErosController {
         encoderListenerX.newPos( currentx - pcbZeroX );
         encoderListenerY.newPos( currenty - pcbZeroY );
 
-        moveTo(p, currentx, currenty + i, minAcc, minVel, FALSE);
+        moveTo(p, currentx, currenty + i, minAcc, minVel, TRUE);
     }
 
     public void moveX(int i) {
-        System.out.println("TeknicController.moveX " + i);
+        //System.out.println("TeknicController.moveX " + i);
 
         Double doublex= getPositionX(p);
         Double doubley= getPositionY(p);
@@ -186,7 +194,7 @@ public class DeltaProtoDriver implements ErosController {
         encoderListenerX.newPos( currentx - pcbZeroX );
         encoderListenerY.newPos( currenty - pcbZeroY );
 
-        moveTo(p, currentx + i, currenty, minAcc, minVel, FALSE);
+        moveTo(p, currentx + i, currenty, minAcc, minVel, TRUE);
     }
 
     public void setUpdateSpeed(int updateSpeed) {
@@ -225,5 +233,14 @@ public class DeltaProtoDriver implements ErosController {
         else {
             System.out.println("INVALID SPEED VALUE");
         }
+    }
+
+    @Override
+    public void run() {
+        Integer x = getPosX();
+        Integer y = getPosY();
+
+        encoderListenerX.newPos( x );
+        encoderListenerY.newPos( y );
     }
 }

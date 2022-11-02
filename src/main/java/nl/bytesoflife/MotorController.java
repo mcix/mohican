@@ -1,11 +1,9 @@
 package nl.bytesoflife;
 
 import jssc.SerialPortException;
-import org.apache.poi.util.ArrayUtil;
+import jssc.SerialPortTimeoutException;
 
 import javax.swing.*;
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -22,7 +20,10 @@ public class MotorController extends Thread
 
     private boolean running= true;
 
+    private String axis = "";
+
     ArrayList<EncoderListener> listeners= new ArrayList<EncoderListener>();
+    ArrayList<AxisListener> axisListeners= new ArrayList<AxisListener>();
 
     private LinkedBlockingQueue<String> messages= new LinkedBlockingQueue<String>();
 
@@ -56,18 +57,29 @@ public class MotorController extends Thread
         while(running)
         {
 
-            try
-            {
+            try {
                 String value = port.readString();
 
                 //System.out.println(value);
 
-                try {
-                    Integer pos = Integer.parseInt(value.replace("\r", ""));
+                if (isNumeric(value)) {
+                    try {
+                        Integer pos = Integer.parseInt(value.replace("\r", ""));
 
-                    fireNewPosition(pos);
+                        fireNewPosition(pos);
 
-                } catch (Exception e) {}
+                    } catch (Exception e) {
+                    }
+                } else {
+                    System.out.println(value);
+                    if (value.startsWith("AXIS=")) {
+                        axis = value.replace("AXIS=", "").replace("\r", "").replace("\n", "");
+                        for (AxisListener axisListener : axisListeners) {
+                            axisListener.receiveAxis(axis, this);
+                        }
+
+                    }
+                }
 
                 //port.writeString("P\n");
                 /*byte[] res = port.readData(6);
@@ -97,23 +109,30 @@ public class MotorController extends Thread
                     }
                 }*/
 
-                if (messages.peek() != null)
-                {
-                    try
-                    {
+                if (messages.peek() != null) {
+                    try {
                         String mes = messages.take();
 
-                        port.writeString(mes);
+                        port.writeString(mes + "\r\n");
 
-                    } catch (InterruptedException e)
-                    {
+                    } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                 }
 
+            } catch (SerialPortTimeoutException e ) {
+
             } catch (Exception e)
             {
                 e.printStackTrace();
+            }
+        }
+
+        if( port != null && port.serialPort != null ) {
+            try {
+                port.serialPort.closePort();
+            } catch (SerialPortException e) {
+                throw new RuntimeException(e);
             }
         }
         //super.run();
@@ -129,6 +148,17 @@ public class MotorController extends Thread
         }
     }
 
+    private static boolean isNumeric(String strNum) {
+        if (strNum == null) {
+            return false;
+        }
+        try {
+            double d = Double.parseDouble(strNum);
+        } catch (NumberFormatException nfe) {
+            return false;
+        }
+        return true;
+    }
 
     public void steps(int steps)
     {
@@ -225,5 +255,23 @@ public class MotorController extends Thread
 
         messages.add(value);
     }
+
+    public void getAxis( AxisListener listener )
+    {
+        messages.add("a");
+
+        //listener.receiveAxis("X", this);
+
+        axisListeners.add(listener);
+    }
+
+    public String getAxis() {
+        return axis;
+    }
+
+    public static interface AxisListener {
+        void receiveAxis(String axis, MotorController motorController);
+    }
+
 
 }

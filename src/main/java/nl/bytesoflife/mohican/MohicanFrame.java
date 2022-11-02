@@ -85,9 +85,14 @@ public class MohicanFrame extends JFrame {
         setImage(false);
 
         JButton quitButton = new JButton("Quit");
-
         quitButton.addActionListener((ActionEvent event) -> {
             System.exit(0);
+        });
+
+        JButton reconnectButton = new JButton("Reconnect");
+        reconnectButton.addActionListener((ActionEvent event) -> {
+            //System.exit(0);
+            mohican.reInitialize();
         });
 
         messageButton = new JButton("Send position");
@@ -106,11 +111,30 @@ public class MohicanFrame extends JFrame {
         postionLabelY.setHorizontalTextPosition(0);
         postionLabelY.setText("0.0");
 
-        //createLayout(quitButton, messageButton);
-        createLayout(quitButton);
-        createLayout(postionLabelX, postionLabelY);
+        JPanel frame = new JPanel();
 
-        if (Configuration.getInstance().getTeknicPort() == null && Configuration.getInstance().getPortX() == null) {
+        //createLayout(quitButton, messageButton);
+        frame.add(quitButton);
+        frame.add(reconnectButton);
+        frame.setPreferredSize(new Dimension(280, 30));
+
+        JPanel frame2 = new JPanel();
+        frame2.add(new JLabel("X:"));
+        frame2.setPreferredSize(new Dimension(100, 20));
+        JPanel frame3 = new JPanel();
+        frame3.add(new JLabel("Y:"));
+        frame3.setPreferredSize(new Dimension(100, 20));
+        createLayout(frame, frame2, frame3);
+
+        JPanel frame4 = new JPanel();
+        frame4.add(postionLabelX);
+        frame4.setPreferredSize(new Dimension(100, 20));
+        JPanel frame5 = new JPanel();
+        frame5.add(postionLabelY);
+        frame5.setPreferredSize(new Dimension(100, 20));
+        createLayout(frame, frame2, frame3, frame4, frame5);
+
+        if (false && Configuration.getInstance().getTeknicPort() == null && Configuration.getInstance().getPortX() == null) {
             DecimalFormat df = new DecimalFormat();
             sliderX = new JSlider( 0, sliderMaxX, 0);
             sliderY = new JSlider(JSlider.VERTICAL, 0, sliderMaxY, 0);
@@ -135,15 +159,15 @@ public class MohicanFrame extends JFrame {
 
         }
 
-        setTitle("Mohican [DISCONNECTED]");
-        setSize(300, 90);
+        setTitle("Mohican");
+        setSize(250, 130);
         setLocationRelativeTo(null);
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
     }
 
-    private void createLayout(JComponent... arg) {
+    private void createLayout(Container... arg) {
 
         Container pane = getContentPane();
 
@@ -151,7 +175,7 @@ public class MohicanFrame extends JFrame {
 
         pane.setLayout( layout );
 
-        for (JComponent jComponent : arg) {
+        for (Container jComponent : arg) {
             pane.add( jComponent );
         }
 

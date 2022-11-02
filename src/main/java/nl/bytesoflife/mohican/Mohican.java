@@ -144,7 +144,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             erosController = new DeltaProtoDriver(Configuration.getInstance().getTeknicPort(), encoderListenerX, encoderListenerY);
 
             erosController.reInitialize();
-        } else if( Configuration.getInstance().getPortX() != null ) {
+        } else {//if( Configuration.getInstance().getPortX() != null ) {
 
             erosController = new ErosControllerImpl(encoderListenerX, encoderListenerY);
             erosController.reInitialize();
@@ -291,6 +291,10 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         eventListener.addWebsocketProviderListener( this );
     }
 
+    void reInitialize() {
+        erosController.reInitialize();
+    }
+
     ScheduledExecutorService executor = null;
 
     private void setPositionTimeOut(Integer ms) {
@@ -314,11 +318,13 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         BigDecimal y = BigDecimal.valueOf(0);
 
         if( erosController != null ) {
-            String xi = positionX.replace(",", ".");
-            String yi = positionY.replace(",", ".");
+            if( positionX != null && positionY != null ) {
+                String xi = positionX.replace(",", ".");
+                String yi = positionY.replace(",", ".");
 
-            x = new BigDecimal(xi);
-            y = new BigDecimal(yi);
+                x = new BigDecimal(xi);
+                y = new BigDecimal(yi);
+            }
         } else if( mohicanFrame != null ) {
             x =  mohicanFrame.getPostionLabelX();
             y =  mohicanFrame.getPostionLabelY();
