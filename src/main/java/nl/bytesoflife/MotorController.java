@@ -269,6 +269,26 @@ public class MotorController extends Thread
         return axis;
     }
 
+    public void home( Integer current ) {
+        if( current != null && current != 0 ) {
+            messages.add("q " + current);
+        } else {
+            messages.add("q");
+        }
+    }
+
+    public void setCurrent(int current) {
+        messages.add("sc"+current);
+    }
+
+    public void setSpeed(int speed) {
+        messages.add("ss"+speed);
+    }
+
+    public void setAcceleration(int acceleration) {
+        messages.add("sa"+acceleration);
+    }
+
     public static interface AxisListener {
         void receiveAxis(String axis, MotorController motorController);
     }

@@ -164,6 +164,12 @@ public class ErosControllerImpl implements ErosController {
         motorY.setToZero();
     }
 
+    @Override
+    public void home(Integer current) {
+        motorX.home( current );
+        motorY.home( current );
+    }
+
     public void setPosition( Integer posX, Integer posY )
     {
         motorX.setToPosition( posX );
@@ -243,11 +249,19 @@ public class ErosControllerImpl implements ErosController {
 
     @Override
     public void setAccelerationInPercentage(Integer value) {
-
+        motorX.setAcceleration(value);
+        motorY.setAcceleration(value);
     }
 
     @Override
     public void setSpeedInPercentage(Integer value) {
+        motorX.setSpeed(value);
+        motorY.setSpeed(value);
+    }
 
+    @Override
+    public void setCurrent(int current) {
+        motorX.setCurrent(current);
+        motorY.setCurrent(current);
     }
 }

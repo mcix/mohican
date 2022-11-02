@@ -8,6 +8,7 @@ public interface ErosController {
     void reInitialize();
     void closePorts();
     void setZero();
+    void home( Integer current );
     void setPosition( Integer posX, Integer posY );
     void goTo( Integer posX, Integer posY );
     void goToPcb( Integer posX, Integer posY );
@@ -21,4 +22,5 @@ public interface ErosController {
     //Used for Teknic Motor controller
     void setAccelerationInPercentage(Integer value);
     void setSpeedInPercentage(Integer value);
+    void setCurrent(int current);
 }

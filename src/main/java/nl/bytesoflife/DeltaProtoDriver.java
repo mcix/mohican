@@ -112,6 +112,11 @@ public class DeltaProtoDriver implements ErosController, Runnable {
         setPcbPosition(0, 0);
     }
 
+    @Override
+    public void home(Integer current) {
+
+    }
+
     public void setPosition(Integer posX, Integer posY) {
         //System.out.println("DeltaProtoDriver.setPosition " + posX + " " + posY);
 
@@ -224,6 +229,11 @@ public class DeltaProtoDriver implements ErosController, Runnable {
         else {
             System.out.println("INVALID SPEED VALUE");
         }
+    }
+
+    @Override
+    public void setCurrent(int current) {
+
     }
 
     public void setAccelerationInPercentage( Integer value ) {
