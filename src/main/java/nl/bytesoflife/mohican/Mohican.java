@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -27,6 +28,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 public class Mohican implements ReduxEventListener, WebsocketProviderListener, InitializingBean, Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(Mohican.class);
+
+    @Value("${info.app.version:unknown}") String version;
 
     @Autowired
     private SimpMessagingTemplate websocket;
@@ -267,6 +270,10 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     }
                     break;
                 }
+                case "GET_VERSION": {
+                    String javaVersion = System.getProperty("java.version");
+                    sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).build());
+                }
 
             }
 
@@ -274,6 +281,13 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         catch (Exception e) {
             logger.warn("Failed to parse message " + action.getType() + " " + action.getValue());
         }
+    }
+
+    @Data
+    @Builder
+    public static class VersionMessage {
+        String version;
+        String javaVersion;
     }
 
     @Override
@@ -383,6 +397,17 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         ReduxAction reduxAction= new ReduxAction();
         reduxAction.setType(type);
         reduxAction.setValue( position );
+
+        if( websocket != null ) {
+            websocket.convertAndSend(WebSocketConfiguration.MESSAGE_PREFIX + "/mohican/", reduxAction);
+        }
+    }
+
+    void sendMessage(String type, Object value) {
+
+        ReduxAction reduxAction= new ReduxAction();
+        reduxAction.setType(type);
+        reduxAction.setValue( value );
 
         if( websocket != null ) {
             websocket.convertAndSend(WebSocketConfiguration.MESSAGE_PREFIX + "/mohican/", reduxAction);
