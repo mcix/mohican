@@ -46,7 +46,12 @@ public class SimpleSerialPort {
         return ports;
     }
 
-    public byte readByte( ) throws SerialPortException, SerialPortTimeoutException {
+    public byte readByte( ) throws SerialPortException {
+        byte[] buffer = serialPort.readBytes(1);
+        return buffer[0];
+    }
+
+    public byte readByteTimeout( ) throws SerialPortException, SerialPortTimeoutException {
         byte[] buffer = serialPort.readBytes(1, 1000);
         return buffer[0];
     }
@@ -66,6 +71,26 @@ public class SimpleSerialPort {
         byte[] data= value.getBytes();
 
         serialPort.writeBytes(data);
+    }
+
+    public String readStringTimout() throws SerialPortException, SerialPortTimeoutException {
+        byte value= -1;
+        int i=0;
+        byte[] data= new byte[200];
+
+        do
+        {
+            value= readByteTimeout();
+            data[i++]= value;
+        }
+        while( value != -1 && value != '\n');
+
+        String res= new String( data );
+
+        if( res.contains("\n") )
+            return res.substring(0, res.indexOf('\n'));
+        else
+            return "";
     }
 
     public String readString() throws SerialPortException, SerialPortTimeoutException {

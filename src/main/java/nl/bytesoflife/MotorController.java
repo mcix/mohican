@@ -21,6 +21,7 @@ public class MotorController extends Thread
     private boolean running= true;
 
     private String axis = "";
+    private int tryForAxisInformation = 0;
 
     ArrayList<EncoderListener> listeners= new ArrayList<EncoderListener>();
     ArrayList<AxisListener> axisListeners= new ArrayList<AxisListener>();
@@ -49,7 +50,7 @@ public class MotorController extends Thread
     @Override
     public void run()
     {
-
+        boolean hasMessage;
         port.flush();
 
         //messages.add("z");
@@ -58,26 +59,37 @@ public class MotorController extends Thread
         {
 
             try {
-                String value = port.readString();
+                hasMessage = true;
+                String value;
 
-                //System.out.println(value);
-
-                if (isNumeric(value)) {
-                    try {
-                        Integer pos = Integer.parseInt(value.replace("\r", ""));
-
-                        fireNewPosition(pos);
-
-                    } catch (Exception e) {
-                    }
+                if( axis.equals("") ) {
+                    value = port.readStringTimout();
                 } else {
-                    System.out.println(value);
-                    if (value.startsWith("AXIS=")) {
-                        axis = value.replace("AXIS=", "").replace("\r", "").replace("\n", "");
-                        for (AxisListener axisListener : axisListeners) {
-                            axisListener.receiveAxis(axis, this);
-                        }
+                    value = port.readString();
+                }
 
+                try {
+                    Integer pos = Integer.parseInt(value.replace("\r", ""));
+
+                    fireNewPosition(pos);
+
+                    hasMessage = false;
+
+                } catch (Exception e) {
+                }
+
+                if( hasMessage ) {
+                    if (value == null || value.isEmpty()) {
+                        sleep(100);
+                    } else {
+                        System.out.println(value);
+                        if (value.startsWith("AXIS=")) {
+                            axis = value.replace("AXIS=", "").replace("\r", "").replace("\n", "");
+                            for (AxisListener axisListener : axisListeners) {
+                                axisListener.receiveAxis(axis, this);
+                            }
+
+                        }
                     }
                 }
 
@@ -121,6 +133,12 @@ public class MotorController extends Thread
                 }
 
             } catch (SerialPortTimeoutException e ) {
+
+                tryForAxisInformation++;
+                if( tryForAxisInformation > 20 ) {
+                    running = false;
+                    break;
+                }
 
             } catch (Exception e)
             {
