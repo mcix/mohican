@@ -243,17 +243,17 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     break;
                 }
                 case "SET_ACCELERATION": {
-                    Integer value = parseIntValue(action.getValue());
+                    Integer value = Integer.valueOf((String) action.getValue());
                     erosController.setAccelerationInPercentage(value);
                     break;
                 }
                 case "SET_SPEED": {
-                    Integer value = parseIntValue(action.getValue());
+                    Integer value = Integer.valueOf((String) action.getValue());
                     erosController.setSpeedInPercentage(value);
                     break;
                 }
                 case "SET_CURRENT": {
-                    Integer value = parseIntValue(action.getValue());
+                    Integer value = Integer.valueOf((String) action.getValue());
                     erosController.setCurrent(value);
                     break;
                 }
