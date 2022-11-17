@@ -23,4 +23,6 @@ public interface ErosController {
     void setAccelerationInPercentage(Integer value);
     void setSpeedInPercentage(Integer value);
     void setCurrent(int current);
+
+    void message(String device, String value);
 }

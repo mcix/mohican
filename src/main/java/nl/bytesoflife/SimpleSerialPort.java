@@ -52,7 +52,7 @@ public class SimpleSerialPort {
     }
 
     public byte readByteTimeout( ) throws SerialPortException, SerialPortTimeoutException {
-        byte[] buffer = serialPort.readBytes(1, 1000);
+        byte[] buffer = serialPort.readBytes(1, 50);
         return buffer[0];
     }
 

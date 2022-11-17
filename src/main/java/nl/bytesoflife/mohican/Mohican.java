@@ -270,6 +270,12 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     }
                     break;
                 }
+                case "MESSAGE": {
+                    if (action.getValue() != null) {
+                        LinkedHashMap deviceMessage = (LinkedHashMap) action.getValue();
+                        erosController.message((String) deviceMessage.get("device"), (String) deviceMessage.get("value"));
+                    }
+                }
                 case "GET_VERSION": {
                     String javaVersion = System.getProperty("java.version");
                     sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).build());

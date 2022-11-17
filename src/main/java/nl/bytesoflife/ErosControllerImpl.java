@@ -1,5 +1,6 @@
 package nl.bytesoflife;
 
+import jssc.SerialNativeInterface;
 import jssc.SerialPortException;
 import jssc.SerialPortList;
 
@@ -8,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.lang.Thread.sleep;
@@ -23,6 +25,7 @@ public class ErosControllerImpl implements ErosController {
 
     private MotorController motorX;
     private MotorController motorY;
+    private MotorController mainPcb;
 
     final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -42,10 +45,22 @@ public class ErosControllerImpl implements ErosController {
             c.terminate();
         }
 
-        List<String> portNames = Arrays.stream(SerialPortList.getPortNames()).distinct().collect(Collectors.toList());
+        List<String> portNames;
+        if( SerialNativeInterface.getOsType() != 1 ) { //unix
+
+            Pattern p = Pattern.compile("(tty)\\..*");
+
+            portNames = Arrays.stream(SerialPortList.getPortNames(p)).distinct().collect(Collectors.toList());
+        } else {
+            portNames = Arrays.stream(SerialPortList.getPortNames()).distinct().collect(Collectors.toList());
+        }
+
+        portNames = portNames.stream().filter(s -> !s.toLowerCase().contains("bluetooth")).collect(Collectors.toList());
 
         ArrayList<Object> ports = new ArrayList<>();
         for (String port : portNames) {
+
+            //if( !port.toLowerCase().contains("21401") ) continue;
 
             SimpleSerialPort simpleSerialPort = null;
             try {
@@ -74,10 +89,18 @@ public class ErosControllerImpl implements ErosController {
                             if (encoderListenerY != null) {
                                 motorY.addListener(encoderListenerY);
                             }
+                        } else if( axis.equalsIgnoreCase("MAIN") ) {
+                            mainPcb = motorController;
+
+                            mainPcb.sendMessage("L038A700");
+                            mainPcb.sendMessage("L138A700");
+                            mainPcb.sendMessage("L238A700");
+                            mainPcb.sendMessage("L338A700");
+                            mainPcb.sendMessage("L438A700");
                         }
 
-                        if( motorX != null && motorY != null ) {
-                            disconnectOtherPorts();
+                        if( motorX != null && motorY != null && mainPcb != null ) {
+                            //disconnectOtherPorts();
                         }
                     }
                 });
@@ -120,14 +143,14 @@ public class ErosControllerImpl implements ErosController {
             if (encoderListenerX != null) {
                 motorX.addListener(encoderListenerX);
             }
-            motorX.start();
+            //motorX.start();
         }
 
         if( motorY != null ) {
             if (encoderListenerY != null) {
                 motorY.addListener(encoderListenerY);
             }
-            motorY.start();
+            //motorY.start();
         }
 
 
@@ -138,7 +161,7 @@ public class ErosControllerImpl implements ErosController {
         for (MotorController c : connectedDevices) {
             if( c.getAxis() == null || c.getAxis().isEmpty() ) {
                 c.terminate();
-                connectedDevices.remove( c );
+                //connectedDevices.remove( c );
             }
         }
 
@@ -263,5 +286,19 @@ public class ErosControllerImpl implements ErosController {
     public void setCurrent(int current) {
         motorX.setCurrent(current);
         motorY.setCurrent(current);
+    }
+
+    public void message(String device, String value) {
+        switch (device) {
+            case "X":
+                motorX.sendMessage(value);
+                break;
+            case "Y":
+                motorY.sendMessage(value);
+                break;
+            case "MAIN":
+                mainPcb.sendMessage(value);
+                break;
+        }
     }
 }

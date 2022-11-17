@@ -4,9 +4,12 @@ import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
 
 import javax.swing.*;
+import java.awt.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
+
+import static java.lang.Math.PI;
 
 public class MotorController extends Thread
 {
@@ -59,10 +62,21 @@ public class MotorController extends Thread
         {
 
             try {
+                if (messages.peek() != null) {
+                    try {
+                        String mes = messages.take();
+
+                        port.writeString(mes + "\r\n");
+
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+
                 hasMessage = true;
                 String value;
 
-                if( axis.equals("") ) {
+                if( axis.equals("") || axis.equals("MAIN") ) {
                     value = port.readStringTimout();
                 } else {
                     value = port.readString();
@@ -81,6 +95,14 @@ public class MotorController extends Thread
                 if( hasMessage ) {
                     if (value == null || value.isEmpty()) {
                         sleep(100);
+                    } else if( value.startsWith("invalid command") ) {
+                        //this is the main print
+
+                        for (AxisListener axisListener : axisListeners) {
+                            axis = "MAIN";
+                            axisListener.receiveAxis("MAIN", this);
+                        }
+
                     } else {
                         System.out.println(value);
                         if (value.startsWith("AXIS=")) {
@@ -121,23 +143,14 @@ public class MotorController extends Thread
                     }
                 }*/
 
-                if (messages.peek() != null) {
-                    try {
-                        String mes = messages.take();
-
-                        port.writeString(mes + "\r\n");
-
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-
             } catch (SerialPortTimeoutException e ) {
 
-                tryForAxisInformation++;
-                if( tryForAxisInformation > 20 ) {
-                    running = false;
-                    break;
+                if( axis.equals("") ) {
+                    tryForAxisInformation++;
+                    if (tryForAxisInformation > 20) {
+                        running = false;
+                        break;
+                    }
                 }
 
             } catch (Exception e)
@@ -252,6 +265,10 @@ public class MotorController extends Thread
         String value = "f1" + "\n";
 
         messages.add(value);
+    }
+    public void sendMessage(String value)
+    {
+        messages.add( value );
     }
 
     public void terminate()

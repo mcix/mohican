@@ -236,6 +236,11 @@ public class DeltaProtoDriver implements ErosController, Runnable {
 
     }
 
+    @Override
+    public void message(String device, String value) {
+
+    }
+
     public void setAccelerationInPercentage( Integer value ) {
         if( 0 <= value && value <= 100 ) {
             this.acceleration= value;
