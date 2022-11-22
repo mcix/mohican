@@ -92,11 +92,11 @@ public class ErosControllerImpl implements ErosController {
                         } else if( axis.equalsIgnoreCase("MAIN") ) {
                             mainPcb = motorController;
 
-                            mainPcb.sendMessage("L038A700");
-                            mainPcb.sendMessage("L138A700");
-                            mainPcb.sendMessage("L238A700");
-                            mainPcb.sendMessage("L338A700");
-                            mainPcb.sendMessage("L438A700");
+                            //mainPcb.sendMessage("L038A700");
+                            //mainPcb.sendMessage("L138A700");
+                            //mainPcb.sendMessage("L238A700");
+                            //mainPcb.sendMessage("L338A700");
+                            //mainPcb.sendMessage("L438A700");
                         }
 
                         if( motorX != null && motorY != null && mainPcb != null ) {
