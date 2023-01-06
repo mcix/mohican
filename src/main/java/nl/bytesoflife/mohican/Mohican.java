@@ -87,6 +87,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         //if (Configuration.getInstance().getTeknicPort() != null) {
 
             DecimalFormat df = new DecimalFormat();
+            df.setGroupingUsed(false);
             toMMx = Configuration.getInstance().getposToMMx();
             toMMy = Configuration.getInstance().getposToMMy();
 
