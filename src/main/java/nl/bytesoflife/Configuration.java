@@ -23,6 +23,17 @@ public class Configuration
         }
         catch (FileNotFoundException e)
         {
+
+            try {
+                InputStream inputStream = Configuration.class.getResourceAsStream("/configuration.properties");
+                props= new Properties();
+                props.load(inputStream);
+            } catch (FileNotFoundException e2) {
+                e2.printStackTrace();
+            } catch (IOException e2) {
+                e2.printStackTrace();
+            }
+
             e.printStackTrace();
         }
         catch (IOException e)
