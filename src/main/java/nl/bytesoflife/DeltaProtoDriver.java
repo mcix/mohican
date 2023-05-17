@@ -1,5 +1,8 @@
 package nl.bytesoflife;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -8,9 +11,11 @@ import static java.lang.Thread.sleep;
 
 public class DeltaProtoDriver implements ErosController, Runnable {
 
+    private static final Logger logger = LoggerFactory.getLogger(DeltaProtoDriver.class);
+
     static {
-        System.out.println(System.getProperty("java.library.path"));
-        System.out.println("*** load library ***");
+        logger.info(System.getProperty("java.library.path"));
+        logger.info("*** load library ***");
         System.loadLibrary("deltateknic");
     }
 
@@ -71,7 +76,7 @@ public class DeltaProtoDriver implements ErosController, Runnable {
 
     public void reInitialize() {
         int portNum= Integer.valueOf( port );
-        System.out.println("TeknicController.reInitialize " + portNum);
+        logger.info("TeknicController.reInitialize " + portNum);
         p= openPort( portNum );
 
         home(p);
@@ -227,7 +232,7 @@ public class DeltaProtoDriver implements ErosController, Runnable {
             this.speed= value;
         }
         else {
-            System.out.println("INVALID SPEED VALUE");
+            logger.warn("INVALID SPEED VALUE");
         }
     }
 
@@ -246,7 +251,7 @@ public class DeltaProtoDriver implements ErosController, Runnable {
             this.acceleration= value;
         }
         else {
-            System.out.println("INVALID SPEED VALUE");
+            logger.warn("INVALID SPEED VALUE");
         }
     }
 

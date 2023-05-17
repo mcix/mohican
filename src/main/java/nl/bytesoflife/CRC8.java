@@ -68,6 +68,6 @@ public class CRC8
 
         long res= calculateCRC8(data);
 
-        System.out.println("res= " + res);
+        //System.out.println("res= " + res);
     }
 }

@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.socket.messaging.SessionConnectEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
-import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -73,7 +72,7 @@ public class WebSocketEventListener {
     }
 
     @RequestMapping(value = "/mohicanreq", method = RequestMethod.POST)
-    public ResponseEntity mohican(final HttpServletRequest request, @RequestBody ReduxAction action) throws Exception {
+    public ResponseEntity mohican(@RequestBody ReduxAction action) throws Exception {
 
         //logger.info("received a message " + action.getType());
 
@@ -83,7 +82,7 @@ public class WebSocketEventListener {
     }
 
     @RequestMapping(value = "/mohicanpos", method = RequestMethod.GET)
-    public Mohican.Position mohicanpos(final HttpServletRequest request) throws Exception {
+    public Mohican.Position mohicanpos() throws Exception {
 
         //logger.info("received a pos request");
 

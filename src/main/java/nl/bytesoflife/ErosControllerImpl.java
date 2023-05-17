@@ -20,8 +20,8 @@ public class ErosControllerImpl implements ErosController {
 
     List<MotorController> connectedDevices= new ArrayList<>();
 
-    private SimpleSerialPort portX;
-    private SimpleSerialPort portY;
+    private SimpleSerialPort2 portX;
+    private SimpleSerialPort2 portY;
 
     private MotorController motorX;
     private MotorController motorY;
@@ -60,11 +60,9 @@ public class ErosControllerImpl implements ErosController {
         ArrayList<Object> ports = new ArrayList<>();
         for (String port : portNames) {
 
-            //if( !port.toLowerCase().contains("21401") ) continue;
-
-            SimpleSerialPort simpleSerialPort = null;
+            SimpleSerialPort2 simpleSerialPort = null;
             try {
-                simpleSerialPort = new SimpleSerialPort( port, 115200 );
+                simpleSerialPort = new SimpleSerialPort2( port, 115200 );
                 ports.add( simpleSerialPort );
 
                 MotorController motor = new MotorController(simpleSerialPort, Configuration.getInstance().getMotorXinverted(),
@@ -100,13 +98,13 @@ public class ErosControllerImpl implements ErosController {
                         }
 
                         if( motorX != null && motorY != null && mainPcb != null ) {
-                            //disconnectOtherPorts();
+                            disconnectOtherPorts();
                         }
                     }
                 });
 
                 motor.start();
-            } catch (SerialPortException e) {
+            } catch (Exception e) {
 
             }
 

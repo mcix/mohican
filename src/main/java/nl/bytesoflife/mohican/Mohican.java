@@ -23,7 +23,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Component;
 
+@Component
 @SpringBootApplication
 public class Mohican implements ReduxEventListener, WebsocketProviderListener, InitializingBean, Runnable {
 
@@ -93,13 +95,15 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
             EncoderListener encoderListenerX = new EncoderListener() {
                 public void newPos(int value) {
-                    posX = new Integer(value);
+                    posX = (value);
                     String val = df.format(toMMx.multiply(new BigDecimal(posX)));
                     positionX = val;
 
                     if( mohicanFrame != null ) {
                         mohicanFrame.setPostionLabelX( val );
                     }
+
+                    sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).build());
 
                     /*if( postionLabelX != null ) {
                         SwingUtilities.invokeLater(new Runnable() {
@@ -117,13 +121,15 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
             EncoderListener encoderListenerY = new EncoderListener() {
                 public void newPos(final int value) {
-                    posY = new Integer(value);
+                    posY = (value);
                     String val = df.format(toMMy.multiply(new BigDecimal(posY)));
                     positionY = val;
 
                     if( mohicanFrame != null ) {
                         mohicanFrame.setPostionLabelY( val );
                     }
+
+                    sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).build());
 
                     /*if( postionLabelY != null ) {
                         SwingUtilities.invokeLater(new Runnable() {

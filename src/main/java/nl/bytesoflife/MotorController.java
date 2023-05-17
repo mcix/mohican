@@ -2,6 +2,9 @@ package nl.bytesoflife;
 
 import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
+import nl.bytesoflife.mohican.Mohican;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.awt.*;
@@ -13,7 +16,9 @@ import static java.lang.Math.PI;
 
 public class MotorController extends Thread
 {
-    private SimpleSerialPort port= null;
+    private static final Logger logger = LoggerFactory.getLogger(MotorController.class);
+
+    private SimpleSerialPort2 port= null;
     private boolean inverted;
     private boolean validate;
 
@@ -31,7 +36,7 @@ public class MotorController extends Thread
 
     private LinkedBlockingQueue<String> messages= new LinkedBlockingQueue<String>();
 
-    public MotorController( SimpleSerialPort port, Boolean inverted, int defaultSpeed, int defaultAcceleration, int defaultDeceleration )
+    public MotorController( SimpleSerialPort2 port, Boolean inverted, int defaultSpeed, int defaultAcceleration, int defaultDeceleration )
     {
         this.port= port;
         this.inverted= inverted;
@@ -40,7 +45,7 @@ public class MotorController extends Thread
         this.defaultDeceleration= defaultDeceleration;
     }
 
-    public MotorController( SimpleSerialPort port, Boolean inverted, int defaultSpeed, int defaultAcceleration, int defaultDeceleration, Boolean validateSteps )
+    public MotorController( SimpleSerialPort2 port, Boolean inverted, int defaultSpeed, int defaultAcceleration, int defaultDeceleration, Boolean validateSteps )
     {
         this.port= port;
         this.inverted= inverted;
@@ -82,14 +87,16 @@ public class MotorController extends Thread
                     value = port.readString();
                 }
 
-                try {
-                    Integer pos = Integer.parseInt(value.replace("\r", ""));
+                if( value != null && !value.isEmpty() ) {
+                    try {
+                        Integer pos = Integer.parseInt(value.replace("\r", ""));
 
-                    fireNewPosition(pos);
+                        fireNewPosition(pos);
 
-                    hasMessage = false;
+                        hasMessage = false;
 
-                } catch (Exception e) {
+                    } catch (Exception e) {
+                    }
                 }
 
                 if( hasMessage ) {
@@ -104,7 +111,6 @@ public class MotorController extends Thread
                         }
 
                     } else {
-                        System.out.println(value);
                         if (value.startsWith("AXIS=")) {
                             axis = value.replace("AXIS=", "").replace("\r", "").replace("\n", "");
                             for (AxisListener axisListener : axisListeners) {
@@ -143,7 +149,7 @@ public class MotorController extends Thread
                     }
                 }*/
 
-            } catch (SerialPortTimeoutException e ) {
+            } catch (Exception e ) {
 
                 if( axis.equals("") ) {
                     tryForAxisInformation++;
@@ -153,16 +159,13 @@ public class MotorController extends Thread
                     }
                 }
 
-            } catch (Exception e)
-            {
-                e.printStackTrace();
             }
         }
 
         if( port != null && port.serialPort != null ) {
             try {
                 port.serialPort.closePort();
-            } catch (SerialPortException e) {
+            } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }

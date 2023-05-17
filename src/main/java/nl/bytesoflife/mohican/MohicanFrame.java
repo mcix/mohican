@@ -13,7 +13,7 @@ public class MohicanFrame extends JFrame {
     private Mohican mohican;
 
     {
-        setupOSX();
+        //setupOSX();
     }
 
     private JButton messageButton;
@@ -26,7 +26,7 @@ public class MohicanFrame extends JFrame {
     private static Integer sliderMaxX = 61600;
     private static Integer sliderDivider = 100;
 
-    static void setupOSX() {
+    /*static void setupOSX() {
         if( !OSValidator.isMac() ) {
             return;
         }
@@ -62,7 +62,7 @@ public class MohicanFrame extends JFrame {
         } catch (final Throwable t) {
             //log.warn("Error setting up OSX UI:", t);
         }
-    }
+    }*/
 
     public MohicanFrame(Mohican m_mohican) {
         initUI();
