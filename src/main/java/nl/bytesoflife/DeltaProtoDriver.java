@@ -3,6 +3,8 @@ package nl.bytesoflife;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -244,6 +246,11 @@ public class DeltaProtoDriver implements ErosController, Runnable {
     @Override
     public void message(String device, String value) {
 
+    }
+
+    @Override
+    public Map<String, String> getVersion() {
+        return new HashMap<>();
     }
 
     public void setAccelerationInPercentage( Integer value ) {

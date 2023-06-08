@@ -1,5 +1,9 @@
 package nl.bytesoflife;
 
+import org.apache.commons.collections4.KeyValue;
+
+import java.util.Map;
+
 /**
  * Created by avanderheijde on 03/03/2017.
  */
@@ -25,4 +29,6 @@ public interface ErosController {
     void setCurrent(int current);
 
     void message(String device, String value);
+
+    Map<String, String> getVersion();
 }

@@ -4,7 +4,9 @@ import java.awt.*;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -295,7 +297,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 }
                 case "GET_VERSION": {
                     String javaVersion = System.getProperty("java.version");
-                    sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).build());
+                    sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).versions(erosController.getVersion()).build());
                 }
 
             }
@@ -311,6 +313,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     public static class VersionMessage {
         String version;
         String javaVersion;
+
+        Map<String, String> versions = new HashMap<>();
     }
 
     @Override

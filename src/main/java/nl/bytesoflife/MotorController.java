@@ -29,6 +29,7 @@ public class MotorController extends Thread
     private boolean running= true;
 
     private String axis = "";
+    private String version = "?";
     private int tryForAxisInformation = 0;
 
     ArrayList<EncoderListener> listeners= new ArrayList<EncoderListener>();
@@ -96,6 +97,7 @@ public class MotorController extends Thread
                         hasMessage = false;
 
                     } catch (Exception e) {
+                        System.out.println("not a number: " + value);
                     }
                 }
 
@@ -117,6 +119,8 @@ public class MotorController extends Thread
                                 axisListener.receiveAxis(axis, this);
                             }
 
+                        } else if( value.startsWith("VERSION=") ) {
+                            version = value.replace("VERSION=", "").replace("\r", "").replace("\n", "");
                         }
                     }
                 }
@@ -320,6 +324,10 @@ public class MotorController extends Thread
 
     public void setAcceleration(int acceleration) {
         messages.add("sa"+acceleration);
+    }
+
+    public String getVersion() {
+        return version;
     }
 
     public static interface AxisListener {
