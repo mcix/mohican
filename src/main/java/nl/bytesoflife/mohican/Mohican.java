@@ -3,6 +3,7 @@ package nl.bytesoflife.mohican;
 import java.awt.*;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.LinkedHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -88,7 +89,12 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     private void intiDeltaProtoDriver() {
         //if (Configuration.getInstance().getTeknicPort() != null) {
 
+            DecimalFormatSymbols otherSymbols = new DecimalFormatSymbols();
+            otherSymbols.setDecimalSeparator('.');
+            otherSymbols.setGroupingSeparator(',');
+
             DecimalFormat df = new DecimalFormat();
+            df.setDecimalFormatSymbols(otherSymbols);
             df.setGroupingUsed(false);
             toMMx = Configuration.getInstance().getposToMMx();
             toMMy = Configuration.getInstance().getposToMMy();
@@ -98,6 +104,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     posX = (value);
                     String val = df.format(toMMx.multiply(new BigDecimal(posX)));
                     positionX = val;
+
+                    //System.out.println(posX);
 
                     if( mohicanFrame != null ) {
                         mohicanFrame.setPostionLabelX( val );
@@ -125,11 +133,13 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     String val = df.format(toMMy.multiply(new BigDecimal(posY)));
                     positionY = val;
 
+                    //System.out.println(posY);
+
                     if( mohicanFrame != null ) {
                         mohicanFrame.setPostionLabelY( val );
                     }
 
-                    sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).build());
+                    //sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).build());
 
                     /*if( postionLabelY != null ) {
                         SwingUtilities.invokeLater(new Runnable() {
@@ -400,7 +410,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     }
 
     void sendPosition() {
-        sendPosition("MOHICAN_POSITION");
+        //sendPosition("MOHICAN_POSITION");
     }
 
     void sendPosition(String type) {

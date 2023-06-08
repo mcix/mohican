@@ -139,14 +139,14 @@ public class ErosControllerImpl implements ErosController {
 
         if( motorX != null ) {
             if (encoderListenerX != null) {
-                motorX.addListener(encoderListenerX);
+                //motorX.addListener(encoderListenerX);
             }
             //motorX.start();
         }
 
         if( motorY != null ) {
             if (encoderListenerY != null) {
-                motorY.addListener(encoderListenerY);
+                //motorY.addListener(encoderListenerY);
             }
             //motorY.start();
         }

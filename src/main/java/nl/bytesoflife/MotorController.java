@@ -218,13 +218,8 @@ public class MotorController extends Thread
     public void goTo(Integer pos)
     {
         pos= inverted ? -pos : pos;
-
-        if( pos > 0 && pos <= 6000 ) {
-
-            //String value = "moveto " + pos + " " + defaultAcceleration + " " + defaultDeceleration + " " + defaultSpeed + "\n";
-            String value = "m " + pos+ "\n";
-            messages.add(value);
-        }
+        String value = "m " + pos+ "\n";
+        messages.add(value);
     }
 
     private boolean validate( String value )
