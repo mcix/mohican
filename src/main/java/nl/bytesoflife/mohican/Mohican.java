@@ -113,7 +113,9 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                         mohicanFrame.setPostionLabelX( val );
                     }
 
-                    sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).build());
+                    if( positionX != null && positionY != null ) {
+                        sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).build());
+                    }
 
                     /*if( postionLabelX != null ) {
                         SwingUtilities.invokeLater(new Runnable() {
