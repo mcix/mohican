@@ -90,7 +90,7 @@ public class MotorController extends Thread
 
                 if( value != null && !value.isEmpty() ) {
                     try {
-                        Integer pos = Integer.parseInt(value.replace("\r", ""));
+                        Integer pos = Integer.parseInt(value.replace("\r", "").replace("\n", ""));
 
                         fireNewPosition(pos);
 
