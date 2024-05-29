@@ -14,6 +14,8 @@ import java.util.concurrent.TimeUnit;
 import lombok.Builder;
 import lombok.Data;
 import nl.bytesoflife.*;
+import nl.bytesoflife.Inspector.*;
+import nl.bytesoflife.Configuration;
 import nl.bytesoflife.mohican.spring.WebSocketConfiguration;
 import nl.bytesoflife.mohican.spring.WebSocketEventListener;
 import org.slf4j.Logger;
@@ -50,6 +52,10 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     private String positionY;
 
     private ErosController erosController;
+
+    private CanonDriver canonDriver;
+    private boolean sessionOpen = false;
+    private int canonError;
 
     public Mohican() {
         intiDeltaProtoDriver();
@@ -159,6 +165,14 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             };
         //}
 
+        canonDriver = new CanonDriver();
+        canonError =  canonDriver.init();
+        if (canonError != 0) {
+            logger.error("CanonDriver init error: " + canonError);
+        }else {
+            logger.info("CanonDriver init success");
+        }
+
         if (Configuration.getInstance().getTeknicPort() != null) {
 
 
@@ -167,6 +181,11 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
             erosController = new DeltaProtoDriver(Configuration.getInstance().getTeknicPort(), encoderListenerX, encoderListenerY);
 
+            erosController.reInitialize();
+        } else if(canonDriver.findCamera()) {
+            long camera = canonDriver.initCamera();
+
+            erosController = new ErosControllerImpl(encoderListenerX, encoderListenerY);
             erosController.reInitialize();
         } else {//if( Configuration.getInstance().getPortX() != null ) {
 
@@ -302,6 +321,15 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).versions(erosController.getVersion()).build());
                 }
 
+                case "CANON_OPEN_SESSION": {
+                    canonDriver.openSession();
+                }
+                case "CANON_CLOSE_SESSION": {
+                    canonDriver.openSession();
+                }
+                case "CANON_TAKE_PICTURE": {
+                    canonDriver.takePhoto();
+                }
             }
 
         }

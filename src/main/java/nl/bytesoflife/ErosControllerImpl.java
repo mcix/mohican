@@ -1,7 +1,6 @@
 package nl.bytesoflife;
 
 import jssc.SerialNativeInterface;
-import jssc.SerialPortException;
 import jssc.SerialPortList;
 
 import java.util.*;
