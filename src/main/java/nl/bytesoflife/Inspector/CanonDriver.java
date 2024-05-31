@@ -79,7 +79,7 @@ public class CanonDriver {
 
     public class ImageItem {
         private String name;
-        private long itemRef; // We use long to represent pointer/address types in Java
+        private long itemRef;
 
         // Getter and Setter for name
         public String getName() { return name; }
@@ -95,10 +95,10 @@ public class CanonDriver {
     public native int terminateCamera();
 
     // Camera utilities
-    public native long initCamera();
+    public native int initCamera();
     public native int takePhoto();
     public native int openSession();
-    public native long closeSession();
+    public native int closeSession();
     public native int setFocusBracketing(EdsFocusShiftSet item);
     public native ImageItem[] getAllImageInfo();
     public native int formatAll();

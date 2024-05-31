@@ -52,6 +52,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     private String positionY;
 
     private ErosController erosController;
+    private CanonDriver.ImageItem imageItem;
 
     private CanonDriver canonDriver;
     private boolean sessionOpen = false;
@@ -313,7 +314,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 case "MESSAGE": {
                     if (action.getValue() != null) {
                         LinkedHashMap deviceMessage = (LinkedHashMap) action.getValue();
-                        erosController.message((String) deviceMessage.get("device"), (String) deviceMessage.get("value"));
+                        erosController.message((String) deviceMessage.get("devicwe"), (String) deviceMessage.get("value"));
                     }
                 }
                 case "GET_VERSION": {
@@ -325,10 +326,63 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     canonDriver.openSession();
                 }
                 case "CANON_CLOSE_SESSION": {
-                    canonDriver.openSession();
+                    canonDriver.closeSession();
                 }
                 case "CANON_TAKE_PICTURE": {
-                    canonDriver.takePhoto();
+                    int err = canonDriver.takePhoto();
+                    if (err == 0) {
+                        sendMessage("CANON_PHOTO_STATUS", "ok");
+                    } else {
+                        sendMessage("CANON_PHOTO_STATUS", "err: " + err);
+                    }
+                }
+                case "CANON_GET_CURRENT_APERTURE": {
+                    sendMessage("CANON_CURRENT_APERTURE", canonDriver.getApertureSetting());
+                }
+                case "CANON_SET_APERTURE": {
+                    int err = canonDriver.setAperture((Integer) action.getValue());
+                    if (err == 0) {
+                        sendMessage("CANON_APERTURE_STATUS", "ok");
+                    } else {
+                        sendMessage("CANON_APERTURE_STATUS", "err: " + err);
+                    }
+                }
+                case "CANON_GET_ALL_APERTURE": {
+                    sendMessage("CANON_APERTURE_OPTIONS", canonDriver.getListOfApertureOptions());
+                }
+
+                // iso settings
+                case "CANON_GET_CURRENT_ISO": {
+                    sendMessage("CANON_CURRENT_ISO", canonDriver.getIsoSetting());
+                }
+                case "CANON_SET_ISO": {
+                    int err = canonDriver.setIso((Integer) action.getValue());
+                    if (err == 0) {
+                        sendMessage("CANON_ISO_STATUS", "ok");
+                    } else {
+                        sendMessage("CANON_ISO_STATUS", "err: " + err);
+                    }
+                }
+                case "CANON_GET_ALL_ISO": {
+                    sendMessage("CANON_ISO_OPTIONS", canonDriver.getListOfIsoOptions());
+                }
+
+                // shutterspeed settings
+                case "CANON_GET_CURRENT_SHUTTERSPEED": {
+                    sendMessage("CANON_SHUTTERSPEED_CURRENT", canonDriver.getCurrentShutterSpeed());
+                }
+                case "CANON_GET_ALL_SHUTTERSPEED": {
+                    sendMessage("CANON_SHUTTERSPEED_OPTIONS", canonDriver.getShutterSpeedOptions());
+                }
+                case "CANON_SET_SHUTTERSPEED": {
+                    int err = canonDriver.setShutterSpeed((Integer) action.getValue());
+                    if (err == 0) {
+                        sendMessage("CANON_SHUTTERSPEED_STATUS", "ok");
+                    } else {
+                        sendMessage("CANON_SHUTTERSPEED_STATUS", "err: " + err);
+                    }
+                }
+                case "CANON_GET_IMAGE_INFO": {
                 }
             }
 
