@@ -77,19 +77,6 @@ public class CanonDriver {
         public void setReserved(int reserved) { this.reserved = reserved; }
     }
 
-    public class ImageItem {
-        private String name;
-        private long itemRef;
-
-        // Getter and Setter for name
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
-
-        // Getter and Setter for itemRef
-        public long getItemRef() { return itemRef; }
-        public void setItemRef(long itemRef) { this.itemRef = itemRef; }
-    }
-
     // Init and terminate
     public native int init();
     public native int terminateCamera();
@@ -100,9 +87,9 @@ public class CanonDriver {
     public native int openSession();
     public native int closeSession();
     public native int setFocusBracketing(EdsFocusShiftSet item);
-    public native ImageItem[] getAllImageInfo();
+    public native String[] getAllImageInfo();
     public native int formatAll();
-    public native byte[] getImage(long directoryItem);
+    public native byte[] getImage(String imageName);
     public native void DoAll();
     public native boolean findCamera();
 

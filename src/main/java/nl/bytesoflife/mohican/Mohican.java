@@ -52,7 +52,6 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     private String positionY;
 
     private ErosController erosController;
-    private CanonDriver.ImageItem imageItem;
 
     private CanonDriver canonDriver;
     private boolean sessionOpen = false;
@@ -185,6 +184,9 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             erosController.reInitialize();
         } else if(canonDriver.findCamera()) {
             long camera = canonDriver.initCamera();
+            canonDriver.openSession();
+
+            logger.info("Mode: Inspector");
 
             erosController = new ErosControllerImpl(encoderListenerX, encoderListenerY);
             erosController.reInitialize();
@@ -386,7 +388,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     sendMessage("CANON_GET_IMAGE_INFO" , canonDriver.getAllImageInfo());
                 }
                 case "CANON_GET_IMAGE": {
-                    sendMessage("CANON_GET_IMAGE" , canonDriver.getImage((Long) action.getValue()));
+                    sendMessage("CANON_GET_IMAGE" , canonDriver.getImage((String) action.getValue()));
                 }
             }
 
