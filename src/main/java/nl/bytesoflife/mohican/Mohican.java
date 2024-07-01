@@ -183,8 +183,10 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
             erosController.reInitialize();
         } else if(canonDriver.findCamera()) {
-            long camera = canonDriver.initCamera();
-            canonDriver.openSession();
+
+//            canonDriver.findCamera();
+//            long camera = canonDriver.initCamera();
+//            canonDriver.openSession();
 
             logger.info("Mode: Inspector");
 
@@ -251,7 +253,6 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         logger.info("onMessage " + action.getType());
 
         try {
-
             switch (action.getType()) {
                 case "POSITION_TIMEOUT": {
                     Integer delayMs = (Integer) action.getValue();
@@ -324,22 +325,31 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).versions(erosController.getVersion()).build());
                 }
 
+                case "CANON_REINITIALIZE":{
+                    canonDriver.reInitialize();
+                    break;
+                }
+
                 case "CANON_OPEN_SESSION": {
-                    canonDriver.openSession();
+                    logger.warn(String.valueOf(canonDriver.openSession()));
+                    break;
                 }
                 case "CANON_CLOSE_SESSION": {
                     canonDriver.closeSession();
+                    break;
                 }
                 case "CANON_TAKE_PICTURE": {
-                    int err = canonDriver.takePhoto();
-                    if (err == 0) {
-                        sendMessage("CANON_PHOTO_STATUS", "ok");
-                    } else {
-                        sendMessage("CANON_PHOTO_STATUS", "err: " + err);
-                    }
+                    logger.warn(String.valueOf(canonDriver.takePhoto()));
+//                    if (err == 0) {
+//                        sendMessage("CANON_PHOTO_STATUS", "ok");
+//                    } else {
+//                        sendMessage("CANON_PHOTO_STATUS", "err: " + err);
+//                    }
+                    break;
                 }
                 case "CANON_GET_CURRENT_APERTURE": {
                     sendMessage("CANON_CURRENT_APERTURE", canonDriver.getApertureSetting());
+                    break;
                 }
                 case "CANON_SET_APERTURE": {
                     int err = canonDriver.setAperture((Integer) action.getValue());
@@ -348,14 +358,17 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     } else {
                         sendMessage("CANON_APERTURE_STATUS", "err: " + err);
                     }
+                    break;
                 }
                 case "CANON_GET_ALL_APERTURE": {
                     sendMessage("CANON_APERTURE_OPTIONS", canonDriver.getListOfApertureOptions());
+                    break;
                 }
 
                 // iso settings
                 case "CANON_GET_CURRENT_ISO": {
                     sendMessage("CANON_CURRENT_ISO", canonDriver.getIsoSetting());
+                    break;
                 }
                 case "CANON_SET_ISO": {
                     int err = canonDriver.setIso((Integer) action.getValue());
@@ -364,17 +377,25 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     } else {
                         sendMessage("CANON_ISO_STATUS", "err: " + err);
                     }
+                    break;
                 }
                 case "CANON_GET_ALL_ISO": {
                     sendMessage("CANON_ISO_OPTIONS", canonDriver.getListOfIsoOptions());
+                    break;
+                }
+                case "INIT_CAMERA": {
+                    logger.warn(String.valueOf(canonDriver.initCamera()));
+                    break;
                 }
 
                 // shutterspeed settings
                 case "CANON_GET_CURRENT_SHUTTERSPEED": {
                     sendMessage("CANON_SHUTTERSPEED_CURRENT", canonDriver.getCurrentShutterSpeed());
+                    break;
                 }
                 case "CANON_GET_ALL_SHUTTERSPEED": {
                     sendMessage("CANON_SHUTTERSPEED_OPTIONS", canonDriver.getShutterSpeedOptions());
+                    break;
                 }
                 case "CANON_SET_SHUTTERSPEED": {
                     int err = canonDriver.setShutterSpeed((Integer) action.getValue());
@@ -383,13 +404,17 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     } else {
                         sendMessage("CANON_SHUTTERSPEED_STATUS", "err: " + err);
                     }
+                    break;
                 }
                 case "CANON_GET_IMAGE_INFO": {
                     sendMessage("CANON_GET_IMAGE_INFO" , canonDriver.getAllImageInfo());
+                    break;
                 }
                 case "CANON_GET_IMAGE": {
                     sendMessage("CANON_GET_IMAGE" , canonDriver.getImage((String) action.getValue()));
+                    break;
                 }
+
             }
 
         }
@@ -410,6 +435,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     @Override
     public void onConnect() {
         logger.info("onConnect");
+        canonDriver.reInitialize();
         //setTitle("Mohican [CONNECTED]");
 
         //setImage(true);
@@ -438,6 +464,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
     void reInitialize() {
         erosController.reInitialize();
+        canonDriver.reInitialize();
     }
 
     ScheduledExecutorService executor = null;

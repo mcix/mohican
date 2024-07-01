@@ -1,10 +1,7 @@
 package nl.bytesoflife.Inspector;
 
-import com.sun.javaws.IconUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Scanner;
 
 import static java.lang.Thread.sleep;
 
@@ -77,9 +74,22 @@ public class CanonDriver {
         public void setReserved(int reserved) { this.reserved = reserved; }
     }
 
+    public void reInitialize(){
+//        terminate();
+        closeSession();
+        logger.error(String.valueOf(init()));
+        logger.error(String.valueOf(initCamera()));
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            logger.error(e.getMessage());
+        }
+        logger.error(String.valueOf(openSession()));
+    }
+
     // Init and terminate
     public native int init();
-    public native int terminateCamera();
+    public native int terminate();
 
     // Camera utilities
     public native int initCamera();
