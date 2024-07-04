@@ -3,6 +3,8 @@ package nl.bytesoflife.Inspector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
+
 import static java.lang.Thread.sleep;
 
 public class CanonDriver {
@@ -10,6 +12,7 @@ public class CanonDriver {
     private static final Logger logger = LoggerFactory.getLogger(CanonDriver.class);
 
     static {
+        System.setProperty("java.library.path", "nl/bytesoflife/Inspector/Release");
 
         logger.info(System.getProperty("java.library.path"));
         logger.info("*** load library ***");
@@ -75,9 +78,10 @@ public class CanonDriver {
     }
 
     public void reInitialize(){
+        init();
 //        terminate();
         closeSession();
-        logger.error(String.valueOf(init()));
+//        logger.error(String.valueOf(init()));
         logger.error(String.valueOf(initCamera()));
         try {
             Thread.sleep(500);
@@ -107,7 +111,7 @@ public class CanonDriver {
     // ShutterSpeed class functions
     public native String[] getShutterSpeedOptions();
     public native String getCurrentShutterSpeed();
-    public native int setShutterSpeed(int shutterSpeed);
+    public native String setShutterSpeed(int shutterSpeed);
 
     // WhiteBalance class functions
     public native String[]  getListOfWhiteBalanceOptions();
@@ -129,4 +133,24 @@ public class CanonDriver {
     public native String getCurrentImageQuality();
     public native int setImageQuality(int ImageQuality);
 
+
+
+    public static void main(String[] args) {
+        CanonDriver canonDriver = new CanonDriver();
+
+        canonDriver.init();
+
+        System.out.println("start:");
+
+        canonDriver.reInitialize();
+
+        canonDriver.getAllImageInfo();
+
+        System.out.println(Arrays.toString(canonDriver.getImage("IMG_2562.JPG")));
+
+        System.out.println("end...");
     }
+
+    }
+
+
