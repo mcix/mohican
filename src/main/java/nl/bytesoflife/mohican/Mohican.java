@@ -336,7 +336,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     sendMessage("CANON_APERTURE_OPTIONS", canonDriver.getListOfApertureOptions());
                     sendMessage("CANON_ISO_OPTIONS", canonDriver.getListOfIsoOptions());
                     sendMessage("CANON_SHUTTERSPEED_OPTIONS", canonDriver.getShutterSpeedOptions());
-                    sendMessage("CANON_QUALITY_ALL", canonDriver.getImageQualityOptions());
+                    sendMessage("CANON_QUALITY_OPTIONS", canonDriver.getImageQualityOptions());
                     canonDriver.closeSession();
                     canonDriver.openSession();
                     sendMessage("CANON_GET_IMAGE_INFO", canonDriver.getAllImageInfo());
@@ -366,7 +366,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 }
 
                 case "CANON_GET_CURRENT_QUALITY": {
-                    sendMessage("CANON_CURRENT_QUALITY", canonDriver.getCurrentImageQuality());
+                    sendMessage("CANON_QUALITY_CURRENT", canonDriver.getCurrentImageQuality());
                     break;
                 }
 
@@ -375,7 +375,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     break;
                 }
                 case "CANON_GET_ALL_QUALITY": {
-                    sendMessage("CANON_ALL_QUALITY", canonDriver.getImageQualityOptions());
+                    sendMessage("CANON_QUALITY_OPTIONS", canonDriver.getImageQualityOptions());
                     break;
                 }
 
