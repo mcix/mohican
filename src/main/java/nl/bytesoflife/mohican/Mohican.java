@@ -203,10 +203,6 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             erosController.reInitialize();
         } else if (canonDriver.findCamera()) {
 
-//            canonDriver.findCamera();
-//            long camera = canonDriver.initCamera();
-//            canonDriver.openSession();
-
             logger.info("Mode: Inspector");
 
             erosController = new ErosControllerImpl(encoderListenerX, encoderListenerY);
@@ -337,10 +333,34 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     sendMessage("CANON_ISO_OPTIONS", canonDriver.getListOfIsoOptions());
                     sendMessage("CANON_SHUTTERSPEED_OPTIONS", canonDriver.getShutterSpeedOptions());
                     sendMessage("CANON_QUALITY_OPTIONS", canonDriver.getImageQualityOptions());
-                    canonDriver.closeSession();
-                    canonDriver.openSession();
-                    sendMessage("CANON_GET_IMAGE_INFO", canonDriver.getAllImageInfo());
                 }
+
+                case "CANON_GET_ALL_CURRENT_SETTINGS": {
+                    String apertureSetting = canonDriver.getApertureSetting();
+                    String isoSetting = canonDriver.getIsoSetting();
+                    String shutterSpeed = canonDriver.getCurrentShutterSpeed();
+                    String quality = canonDriver.getCurrentImageQuality();
+
+                    // Send messages only if they don't start with "camera"
+                    if (!apertureSetting.startsWith("camera")) {
+                        sendMessage("CANON_APERTURE_CURRENT", apertureSetting);
+                    }
+
+                    if (!isoSetting.startsWith("camera")) {
+                        sendMessage("CANON_ISO_CURRENT", isoSetting);
+                    }
+
+                    if (!shutterSpeed.startsWith("camera")) {
+                        sendMessage("CANON_SHUTTERSPEED_CURRENT", shutterSpeed);
+                    }
+
+                    if (!quality.startsWith("camera")) {
+                        sendMessage("CANON_QUALITY_CURRENT", quality);
+                    }
+                    break;
+
+                }
+
 
                 case "INIT_CAMERA": {
                     canonDriver.initCamera();
@@ -423,14 +443,41 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 case "CANON_GET_IMAGE_INFO": {
                     canonDriver.closeSession();
                     canonDriver.openSession();
+                    try {
+                        // Sleep for 500 milliseconds
+                        Thread.sleep(500);
+                    } catch (InterruptedException e) {
+                        // Handle the exception if needed
+                        e.printStackTrace();
+                    }
                     sendMessage("CANON_GET_IMAGE_INFO", canonDriver.getAllImageInfo());
                     break;
                 }
 
                 case "CANON_GET_IMAGE": {
-                    sendMessage("CANON_GET_IMAGE", Base64.getEncoder().encodeToString(canonDriver.getImage((String) action.getValue())));
+                    try {
+                        // Get the image data from canonDriver based on the action value
+                        String imageName = (String) action.getValue();
+                        byte[] imageData = canonDriver.getImage(imageName);
+
+                        // Check if imageData is not null and has content
+                        if (imageData != null && imageData.length > 0) {
+                            // Encode the image data to Base64
+                            String base64Image = Base64.getEncoder().encodeToString(imageData);
+
+                            // Send the Base64 encoded image as a message
+                            sendMessage("CANON_GET_IMAGE", base64Image);
+                        } else {
+                            // Handle the case where no image data is returned
+                            sendMessage("CANON_GET_IMAGE_ERROR", "No image data found.");
+                        }
+                    } catch (Exception e) {
+                        // Handle exceptions (e.g., logging, sending an error message)
+                        sendMessage("CANON_GET_IMAGE_ERROR", "Error processing image: " + e.getMessage());
+                    }
                     break;
                 }
+
 
             }
 
