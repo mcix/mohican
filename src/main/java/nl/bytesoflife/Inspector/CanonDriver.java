@@ -82,13 +82,15 @@ public class CanonDriver {
 //        terminate();
         closeSession();
 //        logger.error(String.valueOf(init()));
-        logger.error(String.valueOf(initCamera()));
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            logger.error(e.getMessage());
+        int err = initCamera();
+        if(err != 0){
+            logger.error("Canon Error initCamera: " + String.valueOf(err));
         }
-        logger.error(String.valueOf(openSession()));
+
+        err = openSession();
+        if(err != 0){
+            logger.error("Canon Error openSession: " + String.valueOf(err));
+        }
     }
 
     // Init and terminate
@@ -106,6 +108,8 @@ public class CanonDriver {
     public native byte[] getImage(String imageName);
     public native void DoAll();
     public native boolean findCamera();
+
+    public native int setFocusBracketing();
 
 
     // ShutterSpeed class functions

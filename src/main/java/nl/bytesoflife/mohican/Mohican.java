@@ -19,11 +19,13 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
-import java.awt.List;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.util.*;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -56,6 +58,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     public Mohican() {
         intiDeltaProtoDriver();
     }
+
     @Autowired
     public Mohican(ApplicationArguments args) {
 
@@ -443,37 +446,81 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 case "CANON_GET_IMAGE_INFO": {
                     canonDriver.closeSession();
                     canonDriver.openSession();
-                    try {
-                        // Sleep for 500 milliseconds
-                        Thread.sleep(500);
-                    } catch (InterruptedException e) {
-                        // Handle the exception if needed
-                        e.printStackTrace();
-                    }
                     sendMessage("CANON_GET_IMAGE_INFO", canonDriver.getAllImageInfo());
                     break;
                 }
 
                 case "CANON_GET_IMAGE": {
-                    try {
-                        // Get the image data from canonDriver based on the action value
-                        String imageName = (String) action.getValue();
+                    // Get the image data from canonDriver based on the action value
+                    String imageName = (String) action.getValue();
+                    String[] imageInfoArray = canonDriver.getAllImageInfo();
+
+                    boolean imageFound = false;
+
+                    for (String info : imageInfoArray) {
+                        if (info.equals(imageName)) {
+                            imageFound = true;
+                            break;
+                        }
+                    }
+                    if (imageFound) {
                         byte[] imageData = canonDriver.getImage(imageName);
+                        logger.info("length: " + String.valueOf(imageData.length));
 
                         // Check if imageData is not null and has content
-                        if (imageData != null && imageData.length > 0) {
+                        if (imageData.length != 0) {
                             // Encode the image data to Base64
                             String base64Image = Base64.getEncoder().encodeToString(imageData);
 
                             // Send the Base64 encoded image as a message
                             sendMessage("CANON_GET_IMAGE", base64Image);
                         } else {
-                            // Handle the case where no image data is returned
-                            sendMessage("CANON_GET_IMAGE_ERROR", "No image data found.");
+                            logger.error("Image length: " + String.valueOf(imageData.length) + ", trying again...");
+                            imageData = canonDriver.getImage(imageName);
+                            if (imageData.length > 1) {
+                                // Encode the image data to Base64
+                                String base64Image = Base64.getEncoder().encodeToString(imageData);
+                            } else {
+                                logger.error("failed to get image: " + imageName);
+                                // Handle the case where no image data is returned
+                                sendMessage("CANON_GET_IMAGE_ERROR", "No image data found.");
+                            }
                         }
+                    } else {
+                        sendMessage("CANON_GET_IMAGE_ERROR", "Image with " + imageName + " not found.");
+                        sendMessage("CANON_GET_IMAGE_INFO", canonDriver.getAllImageInfo());
+                    }
+                    break;
+                }
+                case "CANON_SETFOCUSBRACKETING": {
+                    try {
+                        // Extract settings from action value
+                        LinkedHashMap<String, Object> settings = (LinkedHashMap<String, Object>) action.getValue();
+
+                        // Create and populate EdsFocusShiftSet
+                        CanonDriver.EdsFocusShiftSet edsFocusShiftSet = new CanonDriver.EdsFocusShiftSet();
+                        edsFocusShiftSet.setAll(
+                                (Integer) settings.get("version"),
+                                (Integer) settings.get("focusShiftFunction"),
+                                (Integer) settings.get("shootingNumber"),
+                                (Integer) settings.get("stepWidth"),
+                                (Integer) settings.get("exposureSmoothing"),
+                                (Integer) settings.get("focusStackingFunction"),
+                                (Integer) settings.get("focusStackingTrimming"),
+                                (Integer) settings.get("reserved")
+                        );
+
+                        // Call the native method to set focus bracketing
+                        int result = canonDriver.setFocusBracketing(edsFocusShiftSet);
+                        if (result != 0) {
+                            logger.error("Error setting focus bracketing: " + result);
+                        } else {
+                            logger.info("Focus bracketing set successfully.");
+                        }
+                    } catch (ClassCastException e) {
+                        logger.error("Error casting action value: " + e.getMessage(), e);
                     } catch (Exception e) {
-                        // Handle exceptions (e.g., logging, sending an error message)
-                        sendMessage("CANON_GET_IMAGE_ERROR", "Error processing image: " + e.getMessage());
+                        logger.error("Unexpected error: " + e.getMessage(), e);
                     }
                     break;
                 }
@@ -491,12 +538,12 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         logger.info("onConnect");
         if (canonDriver.findCamera()) {
             canonDriver.reInitialize();
+            canonDriver.openSession();
+            sendMessage("CANON_GET_IMAGE_INFO", canonDriver.getAllImageInfo());
             sendMessage("CANON_APERTURE_OPTIONS", canonDriver.getListOfApertureOptions());
             sendMessage("CANON_ISO_OPTIONS", canonDriver.getListOfIsoOptions());
             sendMessage("CANON_SHUTTERSPEED_OPTIONS", canonDriver.getShutterSpeedOptions());
-            canonDriver.closeSession();
-            canonDriver.openSession();
-            sendMessage("CANON_GET_IMAGE_INFO", canonDriver.getAllImageInfo());
+
         }
         //setTitle("Mohican [CONNECTED]");
 
