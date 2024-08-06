@@ -270,6 +270,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 case "GOTO": {
                     Position pos = parsePosition(action.getValue());
                     IntPosition intPosition = pos.getInt();
+                    logger.info(String.valueOf(intPosition));
                     erosController.goTo(intPosition.getX(), intPosition.getY());
                     //erosController.disableBrake();
                     break;
@@ -492,7 +493,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     }
                     break;
                 }
-                case "CANON_SETFOCUSBRACKETING": {
+                case "CANON_SET_FOCUS_STACKING": {
                     try {
                         // Extract settings from action value
                         LinkedHashMap<String, Object> settings = (LinkedHashMap<String, Object>) action.getValue();
