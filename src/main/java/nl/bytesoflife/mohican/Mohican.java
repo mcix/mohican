@@ -272,7 +272,20 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     IntPosition intPosition = pos.getInt();
                     logger.info(String.valueOf(intPosition));
                     erosController.goTo(intPosition.getX(), intPosition.getY());
-                    //erosController.disableBrake();
+//                    erosController.disableBrake();
+                    break;
+                }
+                case "BREAK": {
+                    boolean status = (boolean) action.getValue();
+                    if (status) {
+                        erosController.enableBrake();
+//                        erosController.message("X", "b1");
+//                        erosController.message("Y", "b1");
+                    } else {
+                        erosController.disableBrake();
+//                        erosController.message("X", "b0");
+//                        erosController.message("Y", "b0");
+                    }
                     break;
                 }
                 case "SET_PCB_POSITION": {
@@ -314,7 +327,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 case "MESSAGE": {
                     if (action.getValue() != null) {
                         LinkedHashMap deviceMessage = (LinkedHashMap) action.getValue();
-                        erosController.message((String) deviceMessage.get("devicwe"), (String) deviceMessage.get("value"));
+                        erosController.message((String) deviceMessage.get("device"), (String) deviceMessage.get("value"));
                     }
                 }
                 case "GET_VERSION": {

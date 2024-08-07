@@ -248,6 +248,11 @@ public class ErosControllerImpl implements ErosController {
         motorX.disableBrake();
         motorY.disableBrake();
     }
+    public void enableBrake()
+    {
+        motorX.enableBrake();
+        motorY.enableBrake();
+    }
 
     public void moveY(int i)
     {
@@ -286,13 +291,19 @@ public class ErosControllerImpl implements ErosController {
     public void message(String device, String value) {
         switch (device) {
             case "X":
-                motorX.sendMessage(value);
+                if( motorX != null ) {
+                    motorX.sendMessage(value);
+                }
                 break;
             case "Y":
-                motorY.sendMessage(value);
+                if(motorY != null) {
+                    motorY.sendMessage(value);
+                }
                 break;
             case "MAIN":
-                mainPcb.sendMessage(value);
+                if( mainPcb != null ) {
+                    mainPcb.sendMessage(value);
+                }
                 break;
         }
     }

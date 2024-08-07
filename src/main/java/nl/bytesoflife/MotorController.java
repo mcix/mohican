@@ -72,10 +72,10 @@ public class MotorController extends Thread
                     try {
                         String mes = messages.take();
 
-                        port.writeString(mes + "\r\n");
+                        port.writeString(mes + "\n");
 
                     } catch (InterruptedException e) {
-                        e.printStackTrace();
+                        logger.error(e.getMessage());
                     }
                 }
 
@@ -262,11 +262,13 @@ public class MotorController extends Thread
     }
 
 
+    public void enableBrake()
+    {
+        messages.add("b1\n");
+    }
     public void disableBrake()
     {
-        String value = "f1" + "\n";
-
-        messages.add(value);
+        messages.add("b0\n");
     }
     public void sendMessage(String value)
     {

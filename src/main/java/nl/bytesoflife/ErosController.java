@@ -19,6 +19,7 @@ public interface ErosController {
     //void goToPcb( Integer posX, Integer posY, boolean release );
     //void goTo( final Integer posX, final Integer posY, final Integer delayX, final Integer delayY, boolean release );
     void disableBrake();
+    void enableBrake();
     void moveY(int i);
     void moveX(int i);
     void setUpdateSpeed(int updateSpeed);
