@@ -50,6 +50,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     private MohicanFrame mohicanFrame;
     private String positionX;
     private String positionY;
+    public Boolean runningX;
+    public Boolean runningY;
     private ErosController erosController;
     private CanonDriver canonDriver;
     private boolean sessionOpen = false;
@@ -142,7 +144,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 }
 
                 if (positionX != null && positionY != null) {
-                    sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).build());
+                    sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).xRun(runningX).yRun(runningY).build());
+
                 }
 
                     /*if( postionLabelX != null ) {
@@ -156,6 +159,24 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                             }
                         });
                     }*/
+            }
+
+            @Override
+            public void newPos(int value, boolean running) {
+                posX = (value);
+                String val = df.format(toMMx.multiply(new BigDecimal(posX)));
+                positionX = val;
+                runningX = running;
+
+
+
+                if (mohicanFrame != null) {
+                    mohicanFrame.setPostionLabelX(val);
+                }
+
+                if (positionX != null && positionY != null) {
+                    sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).xRun(runningX).yRun(runningY).build());
+                }
             }
         };
 
@@ -183,6 +204,20 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                             }
                         });
                     }*/
+            }
+
+            @Override
+            public void newPos(int value, boolean running) {
+                posY = (value);
+                String val = df.format(toMMy.multiply(new BigDecimal(posY)));
+                positionY = val;
+                runningY = running;
+
+                //System.out.println(posY);
+
+                if (mohicanFrame != null) {
+                    mohicanFrame.setPostionLabelY(val);
+                }
             }
         };
         //}
@@ -624,7 +659,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             x = mohicanFrame.getPostionLabelX();
             y = mohicanFrame.getPostionLabelY();
         }
-        return Position.builder().x(x).y(y).build();
+        return Position.builder().x(x).y(y).xRun(runningX). yRun(runningY).build();
     }
 
     void sendPosition() {
@@ -671,9 +706,11 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
     @Data
     @Builder
-    public static class Position {
+    public static class Position{
         BigDecimal x;
         BigDecimal y;
+        boolean xRun;
+        boolean yRun;
 
         IntPosition getInt() {
             BigDecimal toMMx = Configuration.getInstance().getposToMMx();
@@ -683,8 +720,10 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             BigDecimal y = getY().divide(toMMy, BigDecimal.ROUND_HALF_UP);
             int xi = x.intValue();
             int yi = y.intValue();
+            boolean runx = xRun;
+            boolean runy = yRun;
 
-            return IntPosition.builder().x(xi).y(yi).build();
+            return IntPosition.builder().x(xi).y(yi).xRunning(runx).yRunning(runy).build();
         }
     }
 
@@ -693,5 +732,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     static class IntPosition {
         int x;
         int y;
+        boolean xRunning;
+        boolean yRunning;
+
     }
 }

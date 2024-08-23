@@ -2,6 +2,7 @@ package nl.bytesoflife;
 
 import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
+import lombok.Getter;
 import nl.bytesoflife.mohican.Mohican;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,7 @@ public class MotorController extends Thread
 
     private boolean running= true;
 
+    @Getter
     private String axis = "";
     private String version = "?";
     private int tryForAxisInformation = 0;
@@ -90,14 +92,46 @@ public class MotorController extends Thread
 
                 if( value != null && !value.isEmpty() ) {
                     try {
-                        Integer pos = Integer.parseInt(value.replace("\r", "").replace("\n", ""));
 
-                        fireNewPosition(pos);
+                        String cleanedValue = value.replace("\r", "").replace("\n", "");
+                        if (cleanedValue.contains("run:")) {
+                             int runIndex = cleanedValue.indexOf(" run: ");
 
-                        hasMessage = false;
+                            String pos = cleanedValue.substring(0, runIndex).trim();
+                            String runValueStr = cleanedValue.substring(runIndex + 5).trim(); // "+5" to skip past "run: "
+                            boolean runValue = runValueStr.equals("1");
+                            int intPos = Integer.parseInt(pos);
 
+//                            System.out.println(intPos);
+//                            System.out.println(pos);
+//                            System.out.println(runValue);
+
+                            fireNewPosition(intPos, runValue);
+                            hasMessage = false;
+
+                            // Perform actions based on the value of run
+                            if (runValue == false) {
+//                                System.out.println("Run is 0. Performing action for run = 0.");
+                            } else if (runValue == true) {
+//                                System.out.println("Run is 1. Performing action for run = 1.");
+                            } else {
+                                System.out.println("Unexpected run value: " + runValue);
+                            }
+
+                        } else {
+
+
+                            int pos = Integer.parseInt(cleanedValue);
+
+                            fireNewPosition(pos);
+
+                            hasMessage = false;
+                        }
+
+                    } catch (NumberFormatException e) {
+                        System.out.println("Not a number: " + value);
                     } catch (Exception e) {
-                        System.out.println("not a number: " + value);
+                        System.out.println("Error processing value: " + value);
                     }
                 }
 
@@ -183,6 +217,16 @@ public class MotorController extends Thread
         for (EncoderListener listener : listeners)
         {
             listener.newPos( inverted ? -value: value );
+        }
+    }
+
+    private void fireNewPosition(int value, boolean running)
+    {
+        //System.out.println("MotorController.fireNewPosition " + value);
+
+        for (EncoderListener listener : listeners)
+        {
+            listener.newPos( inverted ? -value: value, running );
         }
     }
 
@@ -302,10 +346,6 @@ public class MotorController extends Thread
         //listener.receiveAxis("X", this);
 
         axisListeners.add(listener);
-    }
-
-    public String getAxis() {
-        return axis;
     }
 
     public void home( Integer current ) {
