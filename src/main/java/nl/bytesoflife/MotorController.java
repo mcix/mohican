@@ -4,8 +4,11 @@ import jssc.SerialPortException;
 import jssc.SerialPortTimeoutException;
 import lombok.Getter;
 import nl.bytesoflife.mohican.Mohican;
+import nl.bytesoflife.mohican.ReduxAction;
+import nl.bytesoflife.mohican.spring.WebSocketConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.graphql.GraphQlProperties;
 
 import javax.swing.*;
 import java.awt.*;
@@ -33,6 +36,7 @@ public class MotorController extends Thread
     private String axis = "";
     private String version = "?";
     private int tryForAxisInformation = 0;
+    private boolean pos = false;
 
     ArrayList<EncoderListener> listeners= new ArrayList<EncoderListener>();
     ArrayList<AxisListener> axisListeners= new ArrayList<AxisListener>();
@@ -94,8 +98,10 @@ public class MotorController extends Thread
                     try {
 
                         String cleanedValue = value.replace("\r", "").replace("\n", "");
-                        if (cleanedValue.contains("run:")) {
-                             int runIndex = cleanedValue.indexOf(" run: ");
+                        if(cleanedValue.equals("POS:OK")){
+                            setPosOk();
+                        } else if (cleanedValue.contains("run:")) {
+                            int runIndex = cleanedValue.indexOf(" run: ");
 
                             String pos = cleanedValue.substring(0, runIndex).trim();
                             String runValueStr = cleanedValue.substring(runIndex + 5).trim(); // "+5" to skip past "run: "
@@ -117,8 +123,8 @@ public class MotorController extends Thread
                             } else {
                                 System.out.println("Unexpected run value: " + runValue);
                             }
-
-                        } else {
+                        }
+                        else {
 
 
                             int pos = Integer.parseInt(cleanedValue);
@@ -217,6 +223,13 @@ public class MotorController extends Thread
         for (EncoderListener listener : listeners)
         {
             listener.newPos( inverted ? -value: value );
+        }
+    }
+
+    private void setPosOk(){
+        for (EncoderListener listener : listeners)
+        {
+            listener.sendPosStatus();
         }
     }
 

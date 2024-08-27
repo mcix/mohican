@@ -36,7 +36,8 @@ import java.util.concurrent.TimeUnit;
 public class Mohican implements ReduxEventListener, WebsocketProviderListener, InitializingBean, Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(Mohican.class);
-
+    public Boolean runningX;
+    public Boolean runningY;
     @Value("${info.app.version:unknown}")
     String version;
     int posX, posY;
@@ -50,8 +51,6 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     private MohicanFrame mohicanFrame;
     private String positionX;
     private String positionY;
-    public Boolean runningX;
-    public Boolean runningY;
     private ErosController erosController;
     private CanonDriver canonDriver;
     private boolean sessionOpen = false;
@@ -132,6 +131,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         toMMy = Configuration.getInstance().getposToMMy();
 
         EncoderListener encoderListenerX = new EncoderListener() {
+
             public void newPos(int value) {
                 posX = (value);
                 String val = df.format(toMMx.multiply(new BigDecimal(posX)));
@@ -169,7 +169,6 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 runningX = running;
 
 
-
                 if (mohicanFrame != null) {
                     mohicanFrame.setPostionLabelX(val);
                 }
@@ -177,6 +176,12 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 if (positionX != null && positionY != null) {
                     sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).xRun(runningX).yRun(runningY).build());
                 }
+            }
+
+            @Override
+            public void sendPosStatus() {
+                logger.info("POS:OK");
+                sendMessage("MOHICAN_AT_DESTINATION", "X");
             }
         };
 
@@ -218,6 +223,11 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 if (mohicanFrame != null) {
                     mohicanFrame.setPostionLabelY(val);
                 }
+            }
+
+            @Override
+            public void sendPosStatus() {
+                    sendMessage("MOHICAN_AT_DESTINATION", "Y");
             }
         };
         //}
@@ -310,7 +320,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 //                    erosController.disableBrake();
                     break;
                 }
-                case "BREAK": {
+                case "BRAKE": {
                     boolean status = (boolean) action.getValue();
                     if (status) {
                         erosController.enableBrake();
@@ -427,13 +437,15 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     canonDriver.closeSession();
                     break;
                 }
-                case "CANON_TAKE_PICTURE": {
-                    logger.warn(String.valueOf(canonDriver.takePhoto()));
-//                    if (err == 0) {
-//                        sendMessage("CANON_PHOTO_STATUS", "ok");
-//                    } else {
-//                        sendMessage("CANON_PHOTO_STATUS", "err: " + err);
-//                    }
+                case "CANON_TAKE_PHOTO": {
+                    int err = canonDriver.takePhoto();
+                    if (err == 0) {
+                        logger.info("CANON_PHOTO_STATUS: OK");
+                        sendMessage("CANON_PHOTO_STATUS", "OK");
+                    } else {
+                        logger.error("CANON_PHOTO_STATUS: "+ err);
+                        sendMessage("CANON_PHOTO_STATUS", "ERROR: " + err);
+                    }
                     break;
                 }
 
@@ -559,6 +571,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                                 (Integer) settings.get("reserved")
                         );
 
+                        logger.error(String.valueOf(edsFocusShiftSet.getFocusStackingFunction()));
+
                         // Call the native method to set focus bracketing
                         int result = canonDriver.setFocusBracketing(edsFocusShiftSet);
                         if (result != 0) {
@@ -659,7 +673,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             x = mohicanFrame.getPostionLabelX();
             y = mohicanFrame.getPostionLabelY();
         }
-        return Position.builder().x(x).y(y).xRun(runningX). yRun(runningY).build();
+        return Position.builder().x(x).y(y).xRun(runningX).yRun(runningY).build();
     }
 
     void sendPosition() {
@@ -679,7 +693,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         }
     }
 
-    void sendMessage(String type, Object value) {
+    public void sendMessage(String type, Object value) {
 
         ReduxAction reduxAction = new ReduxAction();
         reduxAction.setType(type);
@@ -706,7 +720,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
     @Data
     @Builder
-    public static class Position{
+    public static class Position {
         BigDecimal x;
         BigDecimal y;
         boolean xRun;
