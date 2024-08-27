@@ -562,6 +562,46 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     }
                     break;
                 }
+                case "CANON_GET_LAST_IMAGE": {
+                    // Get all image info from canonDriver
+                    String[] imageInfoArray = canonDriver.getAllImageInfo();
+
+                    // Ensure imageInfoArray is not empty before proceeding
+                    if (imageInfoArray.length == 0) {
+                        sendMessage("CANON_GET_IMAGE_ERROR", "No images found.");
+                        break;
+                    }
+
+                    // Get the last image in the array
+                    String lastImageName = imageInfoArray[imageInfoArray.length - 1];
+                    byte[] imageData = canonDriver.getImage(lastImageName);
+
+                    logger.info("length: " + imageData.length);
+
+                    // Check if imageData is not null and has content
+                    if (imageData.length != 0) {
+                        // Encode the image data to Base64
+                        String base64Image = Base64.getEncoder().encodeToString(imageData);
+
+                        // Send the Base64 encoded image as a message
+                        sendMessage("CANON_GET_IMAGE", base64Image);
+                    } else {
+                        logger.error("Image length: " + imageData.length + ", trying again...");
+                        imageData = canonDriver.getImage(lastImageName);
+                        if (imageData.length > 1) {
+                            // Encode the image data to Base64
+                            String base64Image = Base64.getEncoder().encodeToString(imageData);
+                            // Send the Base64 encoded image as a message
+                            sendMessage("CANON_GET_IMAGE", base64Image);
+                        } else {
+                            logger.error("Failed to get image: " + lastImageName);
+                            // Handle the case where no image data is returned
+                            sendMessage("CANON_GET_IMAGE_ERROR", "No image data found.");
+                        }
+                    }
+                    break;
+                }
+
                 case "CANON_SET_FOCUS_STACKING": {
                     try {
                         // Extract settings from action value
