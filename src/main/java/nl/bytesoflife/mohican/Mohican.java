@@ -445,6 +445,15 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     } else {
                         logger.error("CANON_PHOTO_STATUS: "+ err);
                         sendMessage("CANON_PHOTO_STATUS", "ERROR: " + err);
+                        err = canonDriver.init();
+                        err = canonDriver.takePhoto();
+                        if (err == 0) {
+                            logger.info("CANON_PHOTO_STATUS: OK");
+                            sendMessage("CANON_PHOTO_STATUS", "OK");
+                        } else {
+                            logger.error("CANON_PHOTO_STATUS: "+ err);
+                            sendMessage("CANON_PHOTO_STATUS", "ERROR: " + err);}
+
                     }
                     break;
                 }
