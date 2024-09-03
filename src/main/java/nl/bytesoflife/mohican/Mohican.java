@@ -539,17 +539,14 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
                         // Check if imageData is not null and has content
                         if (imageData.length != 0) {
-                            // Encode the image data to Base64
-                            String base64Image = Base64.getEncoder().encodeToString(imageData);
 
                             // Send the Base64 encoded image as a message
-                            sendMessage("CANON_GET_IMAGE", base64Image);
+                            sendMessage("CANON_GET_IMAGE", imageData);
                         } else {
                             logger.error("Image length: " + String.valueOf(imageData.length) + ", trying again...");
                             imageData = canonDriver.getImage(imageName);
                             if (imageData.length > 1) {
-                                // Encode the image data to Base64
-                                String base64Image = Base64.getEncoder().encodeToString(imageData);
+                                sendMessage("CANON_GET_IMAGE", imageData);
                             } else {
                                 logger.error("failed to get image: " + imageName);
                                 // Handle the case where no image data is returned
