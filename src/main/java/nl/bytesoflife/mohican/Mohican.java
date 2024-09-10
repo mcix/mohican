@@ -19,6 +19,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -540,13 +541,14 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                         // Check if imageData is not null and has content
                         if (imageData.length != 0) {
 
+
                             // Send the Base64 encoded image as a message
-                            sendMessage("CANON_GET_IMAGE", imageData);
+                            sendMessage("CANON_GET_IMAGE", Base64.getEncoder().encodeToString(imageData));
                         } else {
                             logger.error("Image length: " + String.valueOf(imageData.length) + ", trying again...");
                             imageData = canonDriver.getImage(imageName);
                             if (imageData.length > 1) {
-                                sendMessage("CANON_GET_IMAGE", imageData);
+                                sendMessage("CANON_GET_IMAGE",  Base64.getEncoder().encodeToString(imageData));
                             } else {
                                 logger.error("failed to get image: " + imageName);
                                 // Handle the case where no image data is returned
