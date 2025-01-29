@@ -179,6 +179,11 @@ public class DeltaProtoDriver implements ErosController, Runnable {
         release(p, TRUE);
     }
 
+    @Override
+    public void enableBrake() {
+
+    }
+
     public void moveY(int i) {
         //System.out.println("TeknicController.moveY " + i);
 

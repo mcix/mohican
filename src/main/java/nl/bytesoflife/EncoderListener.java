@@ -6,4 +6,6 @@ package nl.bytesoflife;
 public interface EncoderListener
 {
     void newPos( int value );
+    void newPos(int value, boolean running);
+    void sendPosStatus();
 }
