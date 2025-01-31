@@ -2,6 +2,8 @@ package nl.bytesoflife;
 
 import java.io.*;
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -225,5 +227,9 @@ public class Configuration
     public Integer getVacuumBottom()
     {
         return Integer.valueOf( props.getProperty( "vacuum.bottom", "2000" ) );
+    }
+
+    public String[] getAllowedOrigins() {
+        return props.getProperty("allowed.origins", "http://localhost:3000|https://deltaproto.com|https://www.deltaproto.com").split("\\|");
     }
 }
