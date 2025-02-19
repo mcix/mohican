@@ -1,4 +1,4 @@
-package nl.bytesoflife.Inspector;
+package nl.bytesoflife.inspector;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +28,7 @@ public class CanonDriver {
     public void runAfterStartup() {
         logger.info("*** runAfterStartup ***");
 
-        System.setProperty("java.library.path", "nl/bytesoflife/Inspector/Release");
+        System.setProperty("java.library.path", "nl/bytesoflife/inspector/Release");
         System.loadLibrary("InspectorCamera");
         System.loadLibrary("EDSDK");
 

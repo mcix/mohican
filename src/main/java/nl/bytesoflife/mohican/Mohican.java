@@ -3,7 +3,7 @@ package nl.bytesoflife.mohican;
 import lombok.Builder;
 import lombok.Data;
 import nl.bytesoflife.*;
-import nl.bytesoflife.Inspector.CanonDriver;
+import nl.bytesoflife.inspector.CanonDriver;
 import nl.bytesoflife.mohican.spring.WebSocketConfiguration;
 import nl.bytesoflife.mohican.spring.WebSocketEventListener;
 import org.slf4j.Logger;
@@ -19,7 +19,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -112,7 +111,10 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         }
 
         ConfigurableApplicationContext ctx = new SpringApplicationBuilder(Mohican.class)
-                .headless(headless).addCommandLineProperties(true).run(args);
+                .headless(headless)
+                .addCommandLineProperties(true)
+                .sources(Mohican.class, CanonDriver.class)
+                .run(args);
     }
 
     public void canonSendAll() {
