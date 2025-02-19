@@ -790,8 +790,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             BigDecimal y = getY().divide(toMMy, BigDecimal.ROUND_HALF_UP);
             int xi = x.intValue();
             int yi = y.intValue();
-            boolean runx = xRun;
-            boolean runy = yRun;
+            Boolean runx = xRun;
+            Boolean runy = yRun;
 
             return IntPosition.builder().x(xi).y(yi).xRunning(runx).yRunning(runy).build();
         }
@@ -802,8 +802,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     static class IntPosition {
         int x;
         int y;
-        boolean xRunning;
-        boolean yRunning;
+        Boolean xRunning;
+        Boolean yRunning;
 
     }
 }
