@@ -10,29 +10,37 @@ import java.util.Arrays;
 
 import static java.lang.Thread.sleep;
 
-@Service
 public class CanonDriver {
 
     private static final Logger logger = LoggerFactory.getLogger(CanonDriver.class);
 
-    // static {
-    //     System.setProperty("java.library.path", "nl/bytesoflife/Inspector/Release");
+//     static {
+//
+//         logger.info("*** load library ***");
+//         System.loadLibrary("InspectorCamera");
+//         System.loadLibrary("EDSDK");
+//         logger.info("*** load library complete ***");
+//     }
 
-    //     logger.info(System.getProperty("java.library.path"));
-    //     logger.info("*** load library ***");
-    //     System.loadLibrary("InspectorCamera");
-    //     System.loadLibrary("EDSDK");
-    // }
+//    @EventListener(ApplicationReadyEvent.class)
+//    public void runAfterStartup() {
+//        logger.info("*** runAfterStartup ***");
+//
+//        logger.info(System.getProperty("java.library.path"));
+//        System.loadLibrary("InspectorCamera");
+//        //System.loadLibrary("EDSDK");
+//
+//        init();
+//        logger.info(String.valueOf(openSession()));
+//        //logger.info(Arrays.toString(getAllImageInfo()));
+//        //logger.info(String.valueOf(takePhoto()));
+//    }
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void runAfterStartup() {
-        logger.info("*** runAfterStartup ***");
-
-        System.setProperty("java.library.path", "nl/bytesoflife/inspector/Release");
+    public void loadLibrary() {
+        logger.info("*** load library ***");
         System.loadLibrary("InspectorCamera");
-        System.loadLibrary("EDSDK");
-
-        reInitialize();
+//        System.loadLibrary("EDSDK");
+        logger.info("*** load library complete ***");
     }
 
     public static class EdsFocusShiftSet {
@@ -108,6 +116,13 @@ public class CanonDriver {
         }
     }
 
+    public String[] allImageInfo() {
+        logger.info("Start allImageInfo");
+        String[] res = getAllImageInfo();
+        logger.info("allImageInfo: " + Arrays.toString(res));
+        return res;
+    }
+
     // Init and terminate
     public native int init();
     public native int terminate();
@@ -154,6 +169,9 @@ public class CanonDriver {
 
 
     public static void main(String[] args) throws InterruptedException {
+
+        System.loadLibrary("InspectorCamera");
+
         CanonDriver canonDriver = new CanonDriver();
 
         System.out.println("start:");
@@ -171,9 +189,12 @@ public class CanonDriver {
             System.err.println("Failed to open session");
             return;
         }
-        System.out.println(" sleep start ");
-        sleep(5000);
-        System.out.println(" sleep stop ");
+
+        //canonDriver.formatAll();
+
+//        System.out.println(" sleep start ");
+//        sleep(5000);
+//        System.out.println(" sleep stop ");
 
         int takePhotoResult = canonDriver.takePhoto();
         System.out.println("Take photo result: " + takePhotoResult);
