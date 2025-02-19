@@ -233,13 +233,13 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         };
         //}
 
-        canonDriver = new CanonDriver();
-        canonError = canonDriver.init();
-        if (canonError != 0) {
-            logger.error("CanonDriver init error: " + canonError);
-        } else {
-            logger.info("CanonDriver init success");
-        }
+            canonDriver = new CanonDriver();
+            canonError = canonDriver.init();
+            if (canonError != 0) {
+                logger.error("CanonDriver init error: " + canonError);
+            } else {
+                logger.info("CanonDriver init success");
+            }
 
         if (Configuration.getInstance().getTeknicPort() != null) {
 
@@ -250,7 +250,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             erosController = new DeltaProtoDriver(Configuration.getInstance().getTeknicPort(), encoderListenerX, encoderListenerY);
 
             erosController.reInitialize();
-        } else if (canonDriver.findCamera()) {
+        } else if (canonDriver != null && canonDriver.findCamera()) {
 
             logger.info("Mode: Inspector");
 
@@ -683,7 +683,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     }
 
     void reInitialize() {
-        if (canonDriver.findCamera()) {
+        if (canonDriver != null && canonDriver.findCamera()) {
             canonDriver.reInitialize();
         }
         erosController.reInitialize();
@@ -771,8 +771,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     public static class Position {
         BigDecimal x;
         BigDecimal y;
-        boolean xRun;
-        boolean yRun;
+        Boolean xRun;
+        Boolean yRun;
 
         IntPosition getInt() {
             BigDecimal toMMx = Configuration.getInstance().getposToMMx();

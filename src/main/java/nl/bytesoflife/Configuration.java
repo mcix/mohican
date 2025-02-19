@@ -85,6 +85,11 @@ public class Configuration
         return props.getProperty("motor.port.y");
     }
 
+    public Boolean getMotoroSimulate()
+    {
+        return Boolean.valueOf(props.getProperty("motor.simulate", "false"));
+    }
+
     public boolean getMotorXinverted()
     {
         return Boolean.valueOf(props.getProperty("motor.invert.x", "false"));

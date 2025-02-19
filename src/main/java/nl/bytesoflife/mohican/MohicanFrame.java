@@ -134,7 +134,7 @@ public class MohicanFrame extends JFrame {
         frame5.setPreferredSize(new Dimension(100, 20));
         createLayout(frame, frame2, frame3, frame4, frame5);
 
-        if (false && Configuration.getInstance().getTeknicPort() == null && Configuration.getInstance().getPortX() == null) {
+        if (Configuration.getInstance().getMotoroSimulate()) {
             DecimalFormat df = new DecimalFormat();
             sliderX = new JSlider( 0, sliderMaxX, 0);
             sliderY = new JSlider(JSlider.VERTICAL, 0, sliderMaxY, 0);
