@@ -12,12 +12,9 @@ public class CanonDriver {
     private static final Logger logger = LoggerFactory.getLogger(CanonDriver.class);
 
     static {
-        System.setProperty("java.library.path", "nl/bytesoflife/Inspector/Release");
-
-        logger.info(System.getProperty("java.library.path"));
         logger.info("*** load library ***");
-        System.loadLibrary("InspectorCamera");
         System.loadLibrary("EDSDK");
+        System.loadLibrary("InspectorCamera");
     }
 
     public static class EdsFocusShiftSet {
@@ -77,20 +74,20 @@ public class CanonDriver {
         public void setReserved(int reserved) { this.reserved = reserved; }
     }
 
-    public void reInitialize(){
-        init();
-//        terminate();
-        closeSession();
-//        logger.error(String.valueOf(init()));
-        int err = initCamera();
-        if(err != 0){
-            logger.error("Canon Error initCamera: " + String.valueOf(err));
-        }
+    public void reInitialize() {
+//        init();
+////        terminate();
+//        closeSession();
+////        logger.error(String.valueOf(init()));
+//        int err = initCamera();
+//        if(err != 0){
+//            logger.error("Canon Error initCamera: " + String.valueOf(err));
+//        }
 
-        err = openSession();
-        if(err != 0){
-            logger.error("Canon Error openSession: " + String.valueOf(err));
-        }
+//        err = openSession();
+//        if(err != 0){
+//            logger.error("Canon Error openSession: " + String.valueOf(err));
+//        }
     }
 
     // Init and terminate
@@ -138,23 +135,71 @@ public class CanonDriver {
     public native int setImageQuality(int ImageQuality);
 
 
-
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         CanonDriver canonDriver = new CanonDriver();
-
-        canonDriver.init();
 
         System.out.println("start:");
 
-        canonDriver.reInitialize();
+        int initResult = canonDriver.init();
+        System.out.println("Init result: " + initResult);
+        if (initResult != 0) {
+            System.err.println("Failed to initialize CanonDriver");
+            return;
+        }
 
-        canonDriver.getAllImageInfo();
+        int openSessionResult = canonDriver.openSession();
+        System.out.println("Open session result: " + openSessionResult);
+        if (openSessionResult != 0) {
+            System.err.println("Failed to open session");
+            return;
+        }
+        System.out.println(" sleep start ");
+        sleep(5000);
+        System.out.println(" sleep stop ");
 
-        System.out.println(Arrays.toString(canonDriver.getImage("IMG_2562.JPG")));
+        int takePhotoResult = canonDriver.takePhoto();
+        System.out.println("Take photo result: " + takePhotoResult);
+        if (takePhotoResult != 0) {
+            System.err.println("Failed to take photo");
+            return;
+        }
 
-        System.out.println("end...");
+        int setImageQualityResult = canonDriver.setImageQuality(4);
+        System.out.println("Set image quality result: " + setImageQualityResult);
+        if (setImageQualityResult != 0) {
+            System.err.println("Failed to set image quality");
+            return;
+        }
+
+        String[] imageInfo = canonDriver.getAllImageInfo();
+        System.out.println("Image info: " + Arrays.toString(imageInfo));
+
+        // Test ISO functions
+        int setIsoResult = canonDriver.setIso(100);
+        System.out.println("Set ISO result: " + setIsoResult);
+        if (setIsoResult != 0) {
+            System.err.println("Failed to set ISO");
+            return;
+        }
+        String isoSetting = canonDriver.getIsoSetting();
+        System.out.println("ISO setting: " + isoSetting);
+
+        // Test Aperture functions
+        int setApertureResult = canonDriver.setAperture(2);
+        System.out.println("Set Aperture result: " + setApertureResult);
+        if (setApertureResult != 0) {
+            System.err.println("Failed to set Aperture");
+            return;
+        }
+        String apertureSetting = canonDriver.getApertureSetting();
+        System.out.println("Aperture setting: " + apertureSetting);
+
+        System.out.println("set shutter speed: " + Arrays.toString(canonDriver.getShutterSpeedOptions()));
+//        int setShutterSpeedResult = Integer.parseInt(canonDriver.setShutterSpeed(8));
+        System.out.println("set shutter speed: " + canonDriver.setShutterSpeed(8) );
+        String shutterSpeedSetting = canonDriver.getCurrentShutterSpeed();
+        System.out.println("Shutter Speed setting: " + shutterSpeedSetting);
     }
-
-    }
+}
 
 
