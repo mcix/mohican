@@ -45,17 +45,21 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     BigDecimal toMMx;
     BigDecimal toMMy;
     ScheduledExecutorService executor = null;
-    @Autowired
-    private SimpMessagingTemplate websocket;
-    @Autowired
-    private WebSocketEventListener eventListener;
     private MohicanFrame mohicanFrame;
     private String positionX;
     private String positionY;
     private ErosController erosController;
-    private CanonDriver canonDriver;
     private boolean sessionOpen = false;
     private int canonError;
+
+    @Autowired
+    private CanonDriver canonDriver;
+
+    @Autowired
+    private WebSocketEventListener eventListener;
+
+    @Autowired
+    private SimpMessagingTemplate websocket;
 
     public Mohican() {
         intiDeltaProtoDriver();
@@ -231,15 +235,14 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     sendMessage("MOHICAN_AT_DESTINATION", "Y");
             }
         };
-        //}
 
-            canonDriver = new CanonDriver();
-            canonError = canonDriver.init();
-            if (canonError != 0) {
-                logger.error("CanonDriver init error: " + canonError);
-            } else {
-                logger.info("CanonDriver init success");
-            }
+        // canonDriver = new CanonDriver();
+        // canonError = canonDriver.init();
+        // if (canonError != 0) {
+        //     logger.error("CanonDriver init error: " + canonError);
+        // } else {
+        //     logger.info("CanonDriver init success");
+        // }
 
         if (Configuration.getInstance().getTeknicPort() != null) {
 

@@ -2,22 +2,37 @@ package nl.bytesoflife.Inspector;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 
 import static java.lang.Thread.sleep;
 
+@Service
 public class CanonDriver {
 
     private static final Logger logger = LoggerFactory.getLogger(CanonDriver.class);
 
-    static {
-        System.setProperty("java.library.path", "nl/bytesoflife/Inspector/Release");
+    // static {
+    //     System.setProperty("java.library.path", "nl/bytesoflife/Inspector/Release");
 
-        logger.info(System.getProperty("java.library.path"));
-        logger.info("*** load library ***");
+    //     logger.info(System.getProperty("java.library.path"));
+    //     logger.info("*** load library ***");
+    //     System.loadLibrary("InspectorCamera");
+    //     System.loadLibrary("EDSDK");
+    // }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void runAfterStartup() {
+        logger.info("*** runAfterStartup ***");
+
+        System.setProperty("java.library.path", "nl/bytesoflife/Inspector/Release");
         System.loadLibrary("InspectorCamera");
         System.loadLibrary("EDSDK");
+
+        reInitialize();
     }
 
     public static class EdsFocusShiftSet {
