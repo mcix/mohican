@@ -12,8 +12,9 @@ public interface ErosController {
     void reInitialize();
     void closePorts();
     void setZero();
-    void home( Integer current );
-    void setPosition( Integer posX, Integer posY );
+    void home( Integer current, Integer directionX, Integer directionY);
+
+    void setPosition(Integer posX, Integer posY );
     void goTo( Integer posX, Integer posY );
     void goToPcb( Integer posX, Integer posY );
     //void goToPcb( Integer posX, Integer posY, boolean release );

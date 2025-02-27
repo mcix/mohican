@@ -361,9 +361,9 @@ public class MotorController extends Thread
         axisListeners.add(listener);
     }
 
-    public void home( Integer current ) {
+    public void home( Integer current, Integer direction ) {
         if( current != null && current != 0 ) {
-            messages.add("q " + current);
+            messages.add("q " + current + " " + direction);
         } else {
             messages.add("q");
         }

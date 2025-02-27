@@ -23,10 +23,7 @@ import java.awt.*;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -371,11 +368,31 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     break;
                 }
                 case "HOME": {
+                    /**
+                     * Home the motors
+                     * <p>
+                     * current: 400
+                     * directionX: 0
+                     * directionY: 1
+                     *
+                     * directions will flip if you change the direction from 0 to 1 or vice versa
+                     * <p>
+                     * string format: "current directionX directionY"
+                     * example: "400 0 1"
+                     *
+                     * spaces in between are mandatory
+                     */
+
                     if (action.getValue() != null) {
-                        Integer value = (Integer) action.getValue();
-                        erosController.home(value);
+                        Integer[] parsedString = Arrays.stream(((String) action.getValue()).split(" ", 3))
+                                                       .map(Integer::parseInt)
+                                                       .toArray(Integer[]::new);
+                        Integer current = parsedString[0];
+                        Integer directionX = parsedString[1];
+                        Integer directionY = parsedString[2];
+                        erosController.home(current, directionX, directionY);
                     } else {
-                        erosController.home(null);
+                        erosController.home(null, 0, 0);
                     }
                     break;
                 }

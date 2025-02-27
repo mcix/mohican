@@ -183,9 +183,9 @@ public class ErosControllerImpl implements ErosController {
     }
 
     @Override
-    public void home(Integer current) {
-        motorX.home( current );
-        motorY.home( current );
+    public void home(Integer current, Integer directionX, Integer directionY) {
+        motorX.home( current, directionX );
+        motorY.home( current, directionY );
     }
 
     public void setPosition( Integer posX, Integer posY )

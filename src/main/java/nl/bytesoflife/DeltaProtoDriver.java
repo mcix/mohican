@@ -120,7 +120,7 @@ public class DeltaProtoDriver implements ErosController, Runnable {
     }
 
     @Override
-    public void home(Integer current) {
+    public void home(Integer current, Integer directionX, Integer directionY ) {
 
     }
 
