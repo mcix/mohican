@@ -288,6 +288,12 @@ public class ErosControllerImpl implements ErosController {
         motorY.setCurrent(current);
     }
 
+    @Override
+    public void setMaxPosition(int max) {
+        motorX.setMaxPosition(max);
+        motorY.setMaxPosition(max);
+    }
+
     public void message(String device, String value) {
         switch (device) {
             case "X":

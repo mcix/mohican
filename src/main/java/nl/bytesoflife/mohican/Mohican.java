@@ -363,6 +363,13 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     erosController.setCurrent(value);
                     break;
                 }
+                case "SET_MIN_MAX_POSITION": {
+                    String[] values = ((String) action.getValue()).split(" ");
+                    Integer min = Integer.valueOf(values[0]);
+                    Integer max = Integer.valueOf(values[1]);
+                    erosController.setMinMaxPosition(min, max);
+                    break;
+                }
                 case "ZERO": {
                     erosController.setZero();
                     break;

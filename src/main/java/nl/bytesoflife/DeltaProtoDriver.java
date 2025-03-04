@@ -249,6 +249,11 @@ public class DeltaProtoDriver implements ErosController, Runnable {
     }
 
     @Override
+    public void setMaxPosition(int max) {
+
+    }
+
+    @Override
     public void message(String device, String value) {
 
     }

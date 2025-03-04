@@ -381,6 +381,15 @@ public class MotorController extends Thread
         messages.add("sa"+acceleration);
     }
 
+    public void setMinMaxPosition(int minPosition, int maxPosition) {
+        if( inverted ) {
+            int temp= minPosition;
+            minPosition= -maxPosition;
+            maxPosition= -temp;
+        }
+        messages.add("x "+minPosition + " " + maxPosition);
+    }
+
     public String getVersion() {
         return version;
     }
