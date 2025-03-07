@@ -17,6 +17,8 @@ public class MohicanFrame extends JFrame {
     }
 
     private JButton messageButton;
+    private JLabel labelX;
+    private JLabel labelY;
     private JLabel postionLabelX;
     private JLabel postionLabelY;
 
@@ -84,19 +86,10 @@ public class MohicanFrame extends JFrame {
 
         setImage(false);
 
-        JButton quitButton = new JButton("Quit");
-        quitButton.addActionListener((ActionEvent event) -> {
-            System.exit(0);
-        });
-
-        JButton reconnectButton = new JButton("Reconnect");
-        reconnectButton.addActionListener((ActionEvent event) -> {
-            //System.exit(0);
-            mohican.reInitialize();
-        });
+        JLabel titleLabel = new JLabel("", SwingConstants.CENTER);
 
         messageButton = new JButton("Send position");
-        messageButton.setEnabled( false );
+        messageButton.setEnabled(false);
         messageButton.addActionListener((ActionEvent event) -> {
             //sendPosition();
         });
@@ -111,32 +104,38 @@ public class MohicanFrame extends JFrame {
         postionLabelY.setHorizontalTextPosition(0);
         postionLabelY.setText("0.0");
 
-        JPanel frame = new JPanel();
-
-        //createLayout(quitButton, messageButton);
-        frame.add(quitButton);
-        frame.add(reconnectButton);
-        frame.setPreferredSize(new Dimension(280, 30));
+        labelX = new JLabel("X:");
+        labelY = new JLabel("Y:");
 
         JPanel frame2 = new JPanel();
-        frame2.add(new JLabel("X:"));
-        frame2.setPreferredSize(new Dimension(100, 20));
-        JPanel frame3 = new JPanel();
-        frame3.add(new JLabel("Y:"));
-        frame3.setPreferredSize(new Dimension(100, 20));
-        createLayout(frame, frame2, frame3);
 
-        JPanel frame4 = new JPanel();
-        frame4.add(postionLabelX);
-        frame4.setPreferredSize(new Dimension(100, 20));
-        JPanel frame5 = new JPanel();
-        frame5.add(postionLabelY);
-        frame5.setPreferredSize(new Dimension(100, 20));
-        createLayout(frame, frame2, frame3, frame4, frame5);
+        frame2.add(labelX);
+        frame2.add(postionLabelX);
+        frame2.add(labelY);
+        frame2.add(postionLabelY);
+        frame2.setPreferredSize(new Dimension(200, 20));
+
+        JButton quitButton = new JButton("Quit");
+        quitButton.addActionListener((ActionEvent event) -> {
+            System.exit(0);
+        });
+
+        JButton reconnectButton = new JButton("Reconnect");
+        reconnectButton.addActionListener((ActionEvent event) -> {
+            //System.exit(0);
+            mohican.reInitialize();
+        });
+
+        JPanel frame = new JPanel();
+        frame.add(quitButton);
+        frame.add(reconnectButton);
+        frame.setPreferredSize(new Dimension(200, 30));
+
+        createLayout(titleLabel, frame2, frame);
 
         if (Configuration.getInstance().getMotoroSimulate()) {
             DecimalFormat df = new DecimalFormat();
-            sliderX = new JSlider( 0, sliderMaxX, 0);
+            sliderX = new JSlider(0, sliderMaxX, 0);
             sliderY = new JSlider(JSlider.VERTICAL, 0, sliderMaxY, 0);
 
             sliderX.addChangeListener(e -> {
@@ -156,7 +155,6 @@ public class MohicanFrame extends JFrame {
             Container pane = getContentPane();
             pane.add(sliderY);
             pane.add(sliderX);
-
         }
 
         setTitle("Mohican");
@@ -164,21 +162,52 @@ public class MohicanFrame extends JFrame {
         setLocationRelativeTo(null);
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-
     }
 
     private void createLayout(Container... arg) {
 
         Container pane = getContentPane();
+        pane.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 2;
+        pane.add(arg[0], gbc);
 
-        FlowLayout layout = new FlowLayout();
+        gbc.gridwidth = 2;
+        gbc.gridy = 1;
+        pane.add(arg[1], gbc);
 
-        pane.setLayout( layout );
+        gbc.gridwidth = 2;
+        gbc.gridy = 2;
+        pane.add(arg[2], gbc);
+    }
 
-        for (Container jComponent : arg) {
-            pane.add( jComponent );
-        }
+    public void setTitleLabel(String val) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                setTitle(val);
+            }
+        });
+    }
 
+    public void setXConnectionStatus(boolean val) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                labelX.setForeground(val ? Color.GREEN : Color.RED);
+                labelX.paintImmediately(labelX.getVisibleRect());
+            }
+        });
+    }
+
+    public void setYConnectionStatus(boolean val) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                labelY.setForeground(val ? Color.GREEN : Color.RED);
+                labelY.paintImmediately(labelY.getVisibleRect());
+            }
+        });
     }
 
     public void setPostionLabelX(String val) {

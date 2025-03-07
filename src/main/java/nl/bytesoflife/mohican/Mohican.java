@@ -15,9 +15,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.context.event.EventListener;
 
 import java.awt.*;
 import java.math.BigDecimal;
@@ -53,7 +55,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
     @Autowired
     private CanonDriverWrapper canonDriverWrapper;
-    private CanonDriver canonDriver;
+
+    //private CanonDriver canonDriver;
 
     @Autowired
     private WebSocketEventListener eventListener;
@@ -63,6 +66,17 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
     public Mohican() throws ExecutionException, InterruptedException {
         intiDeltaProtoDriver();
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        eventListener.addReduxEventListener(this);
+        eventListener.addWebsocketProviderListener(this);
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public synchronized void runAfterStartup() {
+        //stub
     }
 
     @Autowired
@@ -709,12 +723,6 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             executor.shutdown();
         }
         //messageButton.setEnabled( false );
-    }
-
-    @Override
-    public void afterPropertiesSet() throws Exception {
-        eventListener.addReduxEventListener(this);
-        eventListener.addWebsocketProviderListener(this);
     }
 
     void reInitialize() {
