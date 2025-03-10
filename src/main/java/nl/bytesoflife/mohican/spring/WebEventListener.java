@@ -22,9 +22,9 @@ import java.util.List;
 @Controller
 @RestController
 @RequestMapping(value = "")
-public class WebSocketEventListener {
+public class WebEventListener {
 
-    private static final Logger logger = LoggerFactory.getLogger(WebSocketEventListener.class);
+    private static final Logger logger = LoggerFactory.getLogger(WebEventListener.class);
 
     private List<ReduxEventListener> eventListenerList= new ArrayList();
     private WebsocketProviderListener websocketProviderListener= null;

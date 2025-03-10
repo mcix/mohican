@@ -26,4 +26,6 @@ public class WebSocketConfiguration extends AbstractWebSocketMessageBrokerConfig
         registry.enableSimpleBroker(MESSAGE_PREFIX);
         registry.setApplicationDestinationPrefixes("/app");
     }
+
+
 }

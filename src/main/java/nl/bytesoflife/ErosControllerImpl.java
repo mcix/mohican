@@ -76,11 +76,19 @@ public class ErosControllerImpl implements ErosController {
                     public void receiveAxis(String axis, MotorController motorController) {
                         if( axis.equalsIgnoreCase("X") ) {
                             motorX = motorController;
+                            motorX.setInverted(Configuration.getInstance().getMotorXinverted());
+                            int min = Configuration.getInstance().getMotorMinX();
+                            int max = Configuration.getInstance().getMotorMaxX();
+                            motorX.setMinMaxPosition(min, max);
                             if (encoderListenerX != null) {
                                 motorX.addListener(encoderListenerX);
                             }
                         } else if( axis.equalsIgnoreCase("Y") ) {
                             motorY = motorController;
+                            motorY.setInverted(Configuration.getInstance().getMotorYinverted());
+                            int min = Configuration.getInstance().getMotorMinY();
+                            int max = Configuration.getInstance().getMotorMaxY();
+                            motorY.setMinMaxPosition(min, max);
                             if (encoderListenerY != null) {
                                 motorY.addListener(encoderListenerY);
                             }
@@ -271,6 +279,12 @@ public class ErosControllerImpl implements ErosController {
     }
 
     @Override
+    public void setMinMaxPosition(int minX, int maxX, int minY, int maxY) {
+        motorX.setMinMaxPosition(minX, maxX);
+        motorY.setMinMaxPosition(minY, maxY);
+    }
+
+    @Override
     public void setAccelerationInPercentage(Integer value) {
         motorX.setAcceleration(value);
         motorY.setAcceleration(value);
@@ -286,12 +300,6 @@ public class ErosControllerImpl implements ErosController {
     public void setCurrent(int current) {
         motorX.setCurrent(current);
         motorY.setCurrent(current);
-    }
-
-    @Override
-    public void setMaxPosition(int max) {
-        motorX.setMaxPosition(max);
-        motorY.setMaxPosition(max);
     }
 
     public void message(String device, String value) {

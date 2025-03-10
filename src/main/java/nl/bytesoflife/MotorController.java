@@ -1,22 +1,13 @@
 package nl.bytesoflife;
 
-import jssc.SerialPortException;
-import jssc.SerialPortTimeoutException;
 import lombok.Getter;
-import nl.bytesoflife.mohican.Mohican;
-import nl.bytesoflife.mohican.ReduxAction;
-import nl.bytesoflife.mohican.spring.WebSocketConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.graphql.GraphQlProperties;
 
 import javax.swing.*;
-import java.awt.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
-
-import static java.lang.Math.PI;
 
 public class MotorController extends Thread
 {
@@ -99,7 +90,7 @@ public class MotorController extends Thread
 
                         String cleanedValue = value.replace("\r", "").replace("\n", "");
                         if(cleanedValue.equals("POS:OK")){
-                            setPosOk();
+                            fireHomingFinished();
                         } else if (cleanedValue.contains("run:")) {
                             int runIndex = cleanedValue.indexOf(" run: ");
 
@@ -152,16 +143,15 @@ public class MotorController extends Thread
                             axisListener.receiveAxis("MAIN", this);
                         }
 
-                    } else {
-                        if (value.startsWith("AXIS=")) {
-                            axis = value.replace("AXIS=", "").replace("\r", "").replace("\n", "");
-                            for (AxisListener axisListener : axisListeners) {
-                                axisListener.receiveAxis(axis, this);
-                            }
-
-                        } else if( value.startsWith("VERSION=") ) {
-                            version = value.replace("VERSION=", "").replace("\r", "").replace("\n", "");
+                    } else if (value.startsWith("AXIS=")) {
+                        axis = value.replace("AXIS=", "").replace("\r", "").replace("\n", "");
+                        for (AxisListener axisListener : axisListeners) {
+                            axisListener.receiveAxis(axis, this);
                         }
+                    } else if( value.startsWith("VERSION=") ) {
+                        version = value.replace("VERSION=", "").replace("\r", "").replace("\n", "");
+                    } else if( value.startsWith("DONE") ) {
+                        fireHomingFinished();
                     }
                 }
 
@@ -226,10 +216,10 @@ public class MotorController extends Thread
         }
     }
 
-    private void setPosOk(){
+    private void fireHomingFinished(){
         for (EncoderListener listener : listeners)
         {
-            listener.sendPosStatus();
+            listener.homingFinished();
         }
     }
 
@@ -379,6 +369,10 @@ public class MotorController extends Thread
 
     public void setAcceleration(int acceleration) {
         messages.add("sa"+acceleration);
+    }
+
+    public void setInverted(boolean inverted) {
+        this.inverted = inverted;
     }
 
     public void setMinMaxPosition(int minPosition, int maxPosition) {

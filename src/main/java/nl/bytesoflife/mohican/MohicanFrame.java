@@ -16,7 +16,7 @@ public class MohicanFrame extends JFrame {
         //setupOSX();
     }
 
-    private JButton messageButton;
+    private JLabel titleLabel;
     private JLabel labelX;
     private JLabel labelY;
     private JLabel postionLabelX;
@@ -86,23 +86,21 @@ public class MohicanFrame extends JFrame {
 
         setImage(false);
 
-        JLabel titleLabel = new JLabel("", SwingConstants.CENTER);
-
-        messageButton = new JButton("Send position");
-        messageButton.setEnabled(false);
-        messageButton.addActionListener((ActionEvent event) -> {
-            //sendPosition();
-        });
+        titleLabel = new JLabel("", SwingConstants.CENTER);
 
         postionLabelX = new JLabel();
         postionLabelX.setHorizontalAlignment(4);
         postionLabelX.setHorizontalTextPosition(0);
         postionLabelX.setText("0.0");
+        //give the label a fixed width
+        postionLabelX.setPreferredSize(new Dimension(45, 20));
 
         postionLabelY = new JLabel();
         postionLabelY.setHorizontalAlignment(4);
         postionLabelY.setHorizontalTextPosition(0);
         postionLabelY.setText("0.0");
+        //give the label a fixed width
+        postionLabelY.setPreferredSize(new Dimension(45, 20));
 
         labelX = new JLabel("X:");
         labelY = new JLabel("Y:");
@@ -113,7 +111,7 @@ public class MohicanFrame extends JFrame {
         frame2.add(postionLabelX);
         frame2.add(labelY);
         frame2.add(postionLabelY);
-        frame2.setPreferredSize(new Dimension(200, 20));
+        frame2.setPreferredSize(new Dimension(200, 45));
 
         JButton quitButton = new JButton("Quit");
         quitButton.addActionListener((ActionEvent event) -> {
@@ -129,7 +127,7 @@ public class MohicanFrame extends JFrame {
         JPanel frame = new JPanel();
         frame.add(quitButton);
         frame.add(reconnectButton);
-        frame.setPreferredSize(new Dimension(200, 30));
+        frame.setPreferredSize(new Dimension(200, 45));
 
         createLayout(titleLabel, frame2, frame);
 
@@ -187,7 +185,8 @@ public class MohicanFrame extends JFrame {
     public void setTitleLabel(String val) {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
-                setTitle(val);
+                titleLabel.setText(val);
+                titleLabel.paintImmediately(titleLabel.getVisibleRect());
             }
         });
     }

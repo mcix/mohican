@@ -100,6 +100,26 @@ public class Configuration
         return Boolean.valueOf(props.getProperty("motor.invert.y", "false"));
     }
 
+    public int getMotorMinX()
+    {
+        return Integer.valueOf(props.getProperty("motor.min.x", "0"));
+    }
+
+    public int getMotorMaxX()
+    {
+        return Integer.valueOf(props.getProperty("motor.max.x", "100"));
+    }
+
+    public int getMotorMinY()
+    {
+        return Integer.valueOf(props.getProperty("motor.min.y", "0"));
+    }
+
+    public int getMotorMaxY()
+    {
+        return Integer.valueOf(props.getProperty("motor.max.y", "100"));
+    }
+
     public int getMotorSpeed()
     {
         return Integer.valueOf(props.getProperty("motor.speed"));
