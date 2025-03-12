@@ -100,24 +100,24 @@ public class Configuration
         return Boolean.valueOf(props.getProperty("motor.invert.y", "false"));
     }
 
-    public int getMotorMinX()
+    public BigDecimal getMotorMinX()
     {
-        return Integer.valueOf(props.getProperty("motor.min.x", "0"));
+        return new BigDecimal(props.getProperty("motor.min.x", "0"));
     }
 
-    public int getMotorMaxX()
+    public BigDecimal getMotorMaxX()
     {
-        return Integer.valueOf(props.getProperty("motor.max.x", "100"));
+        return new BigDecimal(props.getProperty("motor.max.x", "100"));
     }
 
-    public int getMotorMinY()
+    public BigDecimal getMotorMinY()
     {
-        return Integer.valueOf(props.getProperty("motor.min.y", "0"));
+        return new BigDecimal(props.getProperty("motor.min.y", "0"));
     }
 
-    public int getMotorMaxY()
+    public BigDecimal getMotorMaxY()
     {
-        return Integer.valueOf(props.getProperty("motor.max.y", "100"));
+        return new BigDecimal(props.getProperty("motor.max.y", "100"));
     }
 
     public int getMotorSpeed()

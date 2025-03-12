@@ -180,6 +180,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
                 if (mohicanFrame != null) {
                     mohicanFrame.setPostionLabelX(val);
+                    mohicanFrame.setTitleLabel(posX + " ?");
                 }
 
                 if (positionX != null && positionY != null) {
@@ -210,6 +211,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
                 if (mohicanFrame != null) {
                     mohicanFrame.setPostionLabelX(val);
+                    mohicanFrame.setTitleLabel(posX + " " + running);
                 }
 
                 if (positionX != null && positionY != null) {
