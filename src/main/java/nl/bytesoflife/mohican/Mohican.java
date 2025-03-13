@@ -3,10 +3,12 @@ package nl.bytesoflife.mohican;
 import lombok.Builder;
 import lombok.Data;
 import nl.bytesoflife.*;
+import nl.bytesoflife.inspector.CanonDriverListener;
 import nl.bytesoflife.inspector.CanonDriverWrapper;
 import nl.bytesoflife.inspector.CanonDriver;
 import nl.bytesoflife.mohican.spring.WebSocketConfiguration;
-import nl.bytesoflife.mohican.spring.WebSocketEventListener;
+import nl.bytesoflife.mohican.spring.WebEventListener;
+import nl.bytesoflife.mohican.spring.WebSocketController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
@@ -15,9 +17,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.context.event.EventListener;
 
 import java.awt.*;
 import java.math.BigDecimal;
@@ -32,7 +36,7 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 @SpringBootApplication
-public class Mohican implements ReduxEventListener, WebsocketProviderListener, InitializingBean, Runnable {
+public class Mohican implements ReduxEventListener, WebsocketProviderListener, InitializingBean, Runnable, CanonDriverListener {
 
     private static final Logger logger = LoggerFactory.getLogger(Mohican.class);
     public Boolean runningX;
@@ -53,16 +57,43 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
     @Autowired
     private CanonDriverWrapper canonDriverWrapper;
-    private CanonDriver canonDriver;
+
+    //private CanonDriver canonDriver;
 
     @Autowired
-    private WebSocketEventListener eventListener;
+    private WebEventListener eventListener;
+
+    @Autowired
+    private WebSocketController webSocketController;
 
     @Autowired
     private SimpMessagingTemplate websocket;
 
     public Mohican() throws ExecutionException, InterruptedException {
-        intiDeltaProtoDriver();
+
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        eventListener.addReduxEventListener(this);
+        eventListener.addWebsocketProviderListener(this);
+
+        webSocketController.addReduxEventListener(this);
+
+        canonDriverWrapper.addListener(this);
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public synchronized void runAfterStartup() {
+
+
+        try {
+            intiDeltaProtoDriver();
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Autowired
@@ -82,7 +113,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             }
         }
 
-        intiDeltaProtoDriver();
+        //intiDeltaProtoDriver();
 
         if (!headless) {
             try {
@@ -149,10 +180,11 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
                 if (mohicanFrame != null) {
                     mohicanFrame.setPostionLabelX(val);
+                    mohicanFrame.setTitleLabel(posX + " ?");
                 }
 
                 if (positionX != null && positionY != null) {
-                    sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).xRun(runningX).yRun(runningY).build());
+                    //sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).xRun(runningX).yRun(runningY).build());
 
                 }
 
@@ -179,17 +211,17 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
                 if (mohicanFrame != null) {
                     mohicanFrame.setPostionLabelX(val);
+                    mohicanFrame.setTitleLabel(posX + " " + running);
                 }
 
                 if (positionX != null && positionY != null) {
-                    sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).xRun(runningX).yRun(runningY).build());
+                    //sendMessage("MOHICAN_POSITION", Position.builder().x(new BigDecimal(positionX)).y(new BigDecimal(positionY)).xRun(runningX).yRun(runningY).build());
                 }
             }
 
             @Override
-            public void sendPosStatus() {
-                logger.info("POS:OK");
-                sendMessage("MOHICAN_AT_DESTINATION", "X");
+            public void homingFinished() {
+                mohicanFrame.setTitleLabel("Homing X axis finished");
             }
         };
 
@@ -234,8 +266,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             }
 
             @Override
-            public void sendPosStatus() {
-                    sendMessage("MOHICAN_AT_DESTINATION", "Y");
+            public void homingFinished() {
+                mohicanFrame.setTitleLabel("Homing Y axis finished");
             }
         };
 
@@ -256,13 +288,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             erosController = new DeltaProtoDriver(Configuration.getInstance().getTeknicPort(), encoderListenerX, encoderListenerY);
 
             erosController.reInitialize();
-        } else if (canonDriverWrapper != null && canonDriverWrapper.findCamera()) {
-
-            logger.info("Mode: Inspector");
-
-            erosController = new ErosControllerImpl(encoderListenerX, encoderListenerY);
-            erosController.reInitialize();
-        } else {//if( Configuration.getInstance().getPortX() != null ) {
+        } else {
 
             erosController = new ErosControllerImpl(encoderListenerX, encoderListenerY);
             erosController.reInitialize();
@@ -363,6 +389,20 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     erosController.setCurrent(value);
                     break;
                 }
+                case "SET_MIN_MAX_POSITION": {
+                    String[] values = ((String) action.getValue()).split(" ");
+                    Integer minX = Integer.valueOf(values[0]);
+                    Integer maxX = Integer.valueOf(values[1]);
+                    Integer minY = Integer.valueOf(values[2]);
+                    Integer maxY = Integer.valueOf(values[3]);
+
+                    Position minPosition = Position.builder().x(BigDecimal.valueOf(minX)).y(BigDecimal.valueOf(minY)).build();
+                    Position maxPosition = Position.builder().x(BigDecimal.valueOf(maxX)).y(BigDecimal.valueOf(maxY)).build();
+                    IntPosition minIntPosition = minPosition.getInt();
+                    IntPosition maxIntPosition = maxPosition.getInt();
+                    erosController.setMinMaxPosition(minIntPosition.getX(), maxIntPosition.getX(), minIntPosition.getY(), maxIntPosition.getY());
+                    break;
+                }
                 case "ZERO": {
                     erosController.setZero();
                     break;
@@ -394,12 +434,18 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     } else {
                         erosController.home(null, 0, 0);
                     }
+                    mohicanFrame.setTitleLabel("Homing...");
                     break;
                 }
                 case "MESSAGE": {
-                    if (action.getValue() != null) {
-                        LinkedHashMap deviceMessage = (LinkedHashMap) action.getValue();
-                        erosController.message((String) deviceMessage.get("device"), (String) deviceMessage.get("value"));
+                    if (action.getValue() != null && action.getValue() instanceof LinkedHashMap) {
+                        try {
+                            LinkedHashMap<String, String> hashMap = (LinkedHashMap<String, String>) action.getValue();
+                            DeviceMessage deviceMessage = DeviceMessage.fromLinkedHashMap(hashMap);
+                            erosController.message(deviceMessage.getDevice(), deviceMessage.getMessage());
+                        } catch (Exception e) {
+                            logger.error("Error casting action value: " + e.getMessage(), e);
+                        }
                     }
                 }
                 case "GET_VERSION": {
@@ -705,9 +751,19 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     }
 
     @Override
-    public void afterPropertiesSet() throws Exception {
-        eventListener.addReduxEventListener(this);
-        eventListener.addWebsocketProviderListener(this);
+    public void onCameraConnect() {
+        logger.info("onCameraConnect");
+        mohicanFrame.setTitleLabel("Camera connected");
+    }
+
+    @Override
+    public void onCameraDisconnect() {
+        logger.info("onCameraDisconnect");
+    }
+
+    @Override
+    public void onCameraPictureTaken() {
+        logger.info("onCameraPictureTaken");
     }
 
     void reInitialize() {
@@ -750,7 +806,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     }
 
     void sendPosition() {
-        //sendPosition("MOHICAN_POSITION");
+        sendPosition("MOHICAN_POSITION");
     }
 
     void sendPosition(String type) {

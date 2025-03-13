@@ -6,6 +6,8 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -19,14 +21,48 @@ public class CanonDriverWrapper {
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private CanonDriver canonDriver;
 
+    private List<CanonDriverListener> listeners = new ArrayList<>();
+
+    public void addListener(CanonDriverListener listener) {
+        listeners.add(listener);
+    }
+
+    private void handleConnect() {
+        for (CanonDriverListener listener : listeners) {
+            listener.onCameraConnect();
+        }
+    }
+
+    private void handleDisconnect() {
+        for (CanonDriverListener listener : listeners) {
+            listener.onCameraDisconnect();
+        }
+    }
+
+    private void handlePictureTaken() {
+        for (CanonDriverListener listener : listeners) {
+            listener.onCameraPictureTaken();
+        }
+    }
+
     @EventListener(ApplicationReadyEvent.class)
     public synchronized void runAfterStartup() {
         executorService.submit(() -> {
             logger.info("Running after startup");
             canonDriver = new CanonDriver();
             canonDriver.loadLibrary();
-            canonDriver.init();
-            canonDriver.openSession();
+            int initRes = canonDriver.init();
+            if( initRes != 0 ) {
+                logger.error("Failed to initialize CanonDriver");
+                return;
+            }
+            int openRes = canonDriver.openSession();
+            if( openRes != 0 ) {
+                logger.error("Failed to open session");
+                return;
+            }
+
+            handleConnect();
         });
     }
 
@@ -60,6 +96,8 @@ public class CanonDriverWrapper {
     }
 
     public synchronized String[] getAllImageInfo() throws ExecutionException, InterruptedException {
+        executorService.submit(() -> canonDriver.closeSession()).get();
+        executorService.submit(() -> canonDriver.openSession()).get();
         return executorService.submit(() -> canonDriver.getAllImageInfo()).get();
     }
 

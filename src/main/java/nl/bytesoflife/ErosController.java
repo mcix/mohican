@@ -24,6 +24,7 @@ public interface ErosController {
     void moveY(int i);
     void moveX(int i);
     void setUpdateSpeed(int updateSpeed);
+    void setMinMaxPosition(int minX, int maxX, int minY, int maxY);
 
     //Used for Teknic Motor controller
     void setAccelerationInPercentage(Integer value);

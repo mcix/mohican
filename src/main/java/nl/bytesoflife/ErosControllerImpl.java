@@ -2,7 +2,11 @@ package nl.bytesoflife;
 
 import jssc.SerialNativeInterface;
 import jssc.SerialPortList;
+import nl.bytesoflife.mohican.Mohican;
+import nl.bytesoflife.mohican.Mohican.Position;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -76,11 +80,25 @@ public class ErosControllerImpl implements ErosController {
                     public void receiveAxis(String axis, MotorController motorController) {
                         if( axis.equalsIgnoreCase("X") ) {
                             motorX = motorController;
+                            motorX.setInverted(Configuration.getInstance().getMotorXinverted());
+                            BigDecimal toMMx = Configuration.getInstance().getposToMMx();
+                            BigDecimal min = Configuration.getInstance().getMotorMinX();
+                            BigDecimal max = Configuration.getInstance().getMotorMaxX();
+                            int minPos = min.divide(toMMx, RoundingMode.HALF_UP).intValue();
+                            int maxPos = max.divide(toMMx, RoundingMode.HALF_UP).intValue();
+                            motorX.setMinMaxPosition(minPos, maxPos);
                             if (encoderListenerX != null) {
                                 motorX.addListener(encoderListenerX);
                             }
                         } else if( axis.equalsIgnoreCase("Y") ) {
                             motorY = motorController;
+                            motorY.setInverted(Configuration.getInstance().getMotorYinverted());
+                            BigDecimal toMMy = Configuration.getInstance().getposToMMy();
+                            BigDecimal min = Configuration.getInstance().getMotorMinY();
+                            BigDecimal max = Configuration.getInstance().getMotorMaxY();
+                            int minPos = min.divide(toMMy, RoundingMode.HALF_UP).intValue();
+                            int maxPos = max.divide(toMMy, RoundingMode.HALF_UP).intValue();
+                            motorY.setMinMaxPosition(minPos, maxPos);
                             if (encoderListenerY != null) {
                                 motorY.addListener(encoderListenerY);
                             }
@@ -268,6 +286,12 @@ public class ErosControllerImpl implements ErosController {
     {
         motorX.updateDelay( updateSpeed );
         motorY.updateDelay( updateSpeed );
+    }
+
+    @Override
+    public void setMinMaxPosition(int minX, int maxX, int minY, int maxY) {
+        motorX.setMinMaxPosition(minX, maxX);
+        motorY.setMinMaxPosition(minY, maxY);
     }
 
     @Override

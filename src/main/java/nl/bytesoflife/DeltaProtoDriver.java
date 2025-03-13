@@ -215,7 +215,11 @@ public class DeltaProtoDriver implements ErosController, Runnable {
     }
 
     public void setUpdateSpeed(int updateSpeed) {
+    }
 
+    @Override
+    public void setMinMaxPosition(int minX, int maxX, int minY, int maxY) {
+        //not used for teknic
     }
 
     public Integer getPosX() {
@@ -247,6 +251,8 @@ public class DeltaProtoDriver implements ErosController, Runnable {
     public void setCurrent(int current) {
 
     }
+
+
 
     @Override
     public void message(String device, String value) {
