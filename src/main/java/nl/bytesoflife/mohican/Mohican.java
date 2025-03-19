@@ -586,8 +586,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     break;
                 }
                 case "CANON_GET_IMAGE_INFO": {
-                    //canonDriverWrapper.closeSession();
-                    //canonDriverWrapper.openSession();
+                    canonDriverWrapper.closeSession();
+                    canonDriverWrapper.openSession();
                     String[] allImageInfo = canonDriverWrapper.getAllImageInfo();
                     sendMessage("CANON_GET_IMAGE_INFO", allImageInfo);
                     break;
