@@ -180,7 +180,6 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
                 if (mohicanFrame != null) {
                     mohicanFrame.setPostionLabelX(val);
-                    mohicanFrame.setTitleLabel(posX + " ?");
                 }
 
                 if (positionX != null && positionY != null) {
@@ -211,7 +210,6 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
                 if (mohicanFrame != null) {
                     mohicanFrame.setPostionLabelX(val);
-                    mohicanFrame.setTitleLabel(posX + " " + running);
                 }
 
                 if (positionX != null && positionY != null) {
@@ -517,7 +515,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                         logger.info("CANON_PHOTO_STATUS: OK");
                         sendMessage("CANON_PHOTO_STATUS", "OK");
                     } else {
-                        logger.error("CANON_PHOTO_STATUS: "+ err);
+                        logger.error("CANON_PHOTO_STATUS: " + err);
                         sendMessage("CANON_PHOTO_STATUS", "ERROR: " + err);
                         err = canonDriverWrapper.init();
                         err = canonDriverWrapper.takePhoto();
@@ -617,12 +615,14 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
 
                             // Send the Base64 encoded image as a message
-                            sendMessage("CANON_GET_IMAGE", Base64.getEncoder().encodeToString(imageData));
+                            CanonImage canonImage = CanonImage.builder().name(imageName).data(Base64.getEncoder().encodeToString(imageData)).build();
+                            sendMessage("CANON_GET_IMAGE", canonImage);
                         } else {
                             logger.error("Image length: " + String.valueOf(imageData.length) + ", trying again...");
                             imageData = canonDriverWrapper.getImage(imageName);
                             if (imageData.length > 1) {
-                                sendMessage("CANON_GET_IMAGE",  Base64.getEncoder().encodeToString(imageData));
+                                CanonImage canonImage = CanonImage.builder().name(imageName).data(Base64.getEncoder().encodeToString(imageData)).build();
+                                sendMessage("CANON_GET_IMAGE", canonImage);
                             } else {
                                 logger.error("failed to get image: " + imageName);
                                 // Handle the case where no image data is returned
@@ -657,7 +657,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                         String base64Image = Base64.getEncoder().encodeToString(imageData);
 
                         // Send the Base64 encoded image as a message
-                        sendMessage("CANON_GET_IMAGE", base64Image);
+                        CanonImage canonImage = CanonImage.builder().name(lastImageName).data(base64Image).build();
+                        sendMessage("CANON_GET_IMAGE", canonImage);
                     } else {
                         logger.error("Image length: " + imageData.length + ", trying again...");
                         imageData = canonDriverWrapper.getImage(lastImageName);
@@ -665,7 +666,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                             // Encode the image data to Base64
                             String base64Image = Base64.getEncoder().encodeToString(imageData);
                             // Send the Base64 encoded image as a message
-                            sendMessage("CANON_GET_IMAGE", base64Image);
+                            CanonImage canonImage = CanonImage.builder().name(lastImageName).data(base64Image).build();
+                            sendMessage("CANON_GET_IMAGE", canonImage);
                         } else {
                             logger.error("Failed to get image: " + lastImageName);
                             // Handle the case where no image data is returned
@@ -878,5 +880,12 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         Boolean xRunning;
         Boolean yRunning;
 
+    }
+
+    @Data
+    @Builder
+    static class CanonImage {
+        String name;
+        String data;
     }
 }
