@@ -257,4 +257,8 @@ public class Configuration
     public String[] getAllowedOrigins() {
         return props.getProperty("allowed.origins", "http://localhost:3000|https://deltaproto.com|https://www.deltaproto.com").split("\\|");
     }
+
+    public boolean getCameraSimulate() {
+        return Boolean.valueOf(props.getProperty("camera.simulate", "false"));
+    }
 }

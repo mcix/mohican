@@ -4,8 +4,9 @@ import lombok.Builder;
 import lombok.Data;
 import nl.bytesoflife.*;
 import nl.bytesoflife.inspector.CanonDriverListener;
-import nl.bytesoflife.inspector.CanonDriverWrapper;
+import nl.bytesoflife.inspector.CanonDriverWrapperInterface;
 import nl.bytesoflife.inspector.CanonDriver;
+import nl.bytesoflife.inspector.CanonDriverConfiguration;
 import nl.bytesoflife.mohican.spring.WebSocketConfiguration;
 import nl.bytesoflife.mohican.spring.WebEventListener;
 import nl.bytesoflife.mohican.spring.WebSocketController;
@@ -56,7 +57,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     
 
     @Autowired
-    private CanonDriverWrapper canonDriverWrapper;
+    private CanonDriverWrapperInterface canonDriverWrapper;
 
     //private CanonDriver canonDriver;
 
@@ -145,7 +146,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         ConfigurableApplicationContext ctx = new SpringApplicationBuilder(Mohican.class)
                 .headless(headless)
                 .addCommandLineProperties(true)
-                .sources(Mohican.class, CanonDriverWrapper.class)
+                .sources(Mohican.class, CanonDriverConfiguration.class)
                 .run(args);
     }
 
