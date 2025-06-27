@@ -732,24 +732,19 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 //            sendMessage("CANON_SHUTTERSPEED_OPTIONS", canonDriverWrapper.getShutterSpeedOptions());
 //
 //        }
-        //setTitle("Mohican [CONNECTED]");
 
-        //setImage(true);
-
-        //messageButton.setEnabled( true );
+        mohicanFrame.setWebsocketStatus(true);
     }
 
     @Override
     public void onDisconnect() {
         logger.info("onDisconnect");
-        //setTitle("Mohican [DISCONNECTED]");
-
-        //setImage(false);
 
         if (executor != null) {
             executor.shutdown();
         }
-        //messageButton.setEnabled( false );
+
+        mohicanFrame.setWebsocketStatus(false);
     }
 
     @Override

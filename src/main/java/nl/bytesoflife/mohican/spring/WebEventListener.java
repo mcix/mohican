@@ -18,6 +18,7 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Controller
 @RestController
@@ -28,6 +29,9 @@ public class WebEventListener {
 
     private List<ReduxEventListener> eventListenerList= new ArrayList();
     private WebsocketProviderListener websocketProviderListener= null;
+    
+    // Track active session count
+    private final AtomicInteger activeSessionCount = new AtomicInteger(0);
 
     public void addReduxEventListener(ReduxEventListener listener) {
         eventListenerList.add( listener );
@@ -58,12 +62,24 @@ public class WebEventListener {
 
     @EventListener
     private void handleSessionConnected(SessionConnectEvent event) {
-        handleOnConnect();
+        int currentCount = activeSessionCount.incrementAndGet();
+        logger.info("Session connected. Active sessions: {}", currentCount);
+        
+        // Only call handleOnConnect for the first connection
+        if (currentCount == 1) {
+            handleOnConnect();
+        }
     }
 
     @EventListener
     private void handleSessionDisconnect(SessionDisconnectEvent event) {
-        handleOnDisconnect();
+        int currentCount = activeSessionCount.decrementAndGet();
+        logger.info("Session disconnected. Active sessions: {}", currentCount);
+        
+        // Only call handleOnDisconnect when all sessions are closed
+        if (currentCount == 0) {
+            handleOnDisconnect();
+        }
     }
 
     @RequestMapping(value = "/", method = RequestMethod.GET)

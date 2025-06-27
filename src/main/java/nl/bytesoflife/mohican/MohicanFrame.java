@@ -13,7 +13,7 @@ public class MohicanFrame extends JFrame {
     private Mohican mohican;
 
     {
-        //setupOSX();
+        setupOSX();
     }
 
     private JLabel titleLabel;
@@ -28,16 +28,17 @@ public class MohicanFrame extends JFrame {
     private static Integer sliderMaxX = 61600;
     private static Integer sliderDivider = 100;
 
-    /*static void setupOSX() {
-        if( !OSValidator.isMac() ) {
+    static void setupOSX() {
+        if (!OSValidator.isMac()) {
             return;
         }
-        //log.debug("Setting up OSX UI Elements");
         try {
             // Put the menu bar at the top of the screen
             System.setProperty("apple.laf.useScreenMenuBar", "true");
             // Set the name in the menu
-            System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Mohican");
+            System.setProperty("com.apple.mrj.application.apple.menu.about.name", "DeltaProto Mohican");
+            // Set the application name for the dock
+            System.setProperty("apple.awt.application.name", "DeltaProto Mohican");
 
             // This line must come AFTER the above properties are set, otherwise
             // the name will not appear
@@ -52,19 +53,17 @@ public class MohicanFrame extends JFrame {
             });
             //osxApp.setAboutHandler(ah);
             //osxApp.setPreferencesHandler(ph);
-            // Set the dock icon to the largest icon
-            //final Image dockIcon = Toolkit.getDefaultToolkit().getImage(SwingStartup.class.getResource(ICON_RSRC));
-            //osxApp.setDockIconImage(dockIcon);
-
+            
+            // Set the dock icon to the logo
             final Image dockIcon = Toolkit.getDefaultToolkit().getImage(Mohican.class.getResource("/logo.png"));
-
-            osxApp.setDockIconImage(dockIcon);
-            //osxApp.setDockIconBadge("Mohican");
+            if (dockIcon != null) {
+                osxApp.setDockIconImage(dockIcon);
+            }
 
         } catch (final Throwable t) {
-            //log.warn("Error setting up OSX UI:", t);
+            System.err.println("Error setting up OSX UI: " + t.getMessage());
         }
-    }*/
+    }
 
     public MohicanFrame(Mohican m_mohican) {
         initUI();
@@ -187,6 +186,31 @@ public class MohicanFrame extends JFrame {
             public void run() {
                 titleLabel.setText(val);
                 titleLabel.paintImmediately(titleLabel.getVisibleRect());
+            }
+        });
+    }
+
+    public void setWebsocketStatus(boolean val) {
+
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+
+                setTitle("Mohican " + (val ? "⚡️" : ""));
+
+                //set the macos icon to the logo_on.png if val is true, otherwise to the logo.png
+                if (!OSValidator.isMac()) {
+                    return;
+                }
+                final com.apple.eawt.Application osxApp = com.apple.eawt.Application.getApplication();
+                if (osxApp == null) {
+                    // setup.
+                    throw new NullPointerException("com.apple.eawt.Application.getApplication() returned NULL. " + "Aborting OSX UI Setup.");
+                }
+
+                final Image dockIcon = Toolkit.getDefaultToolkit().getImage(Mohican.class.getResource(val ? "/logo_on.png" : "/logo.png"));
+                if (dockIcon != null) {
+                    osxApp.setDockIconImage(dockIcon);
+                }
             }
         });
     }
