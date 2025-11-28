@@ -58,8 +58,8 @@ mvn clean package -DskipTests
 # Commit and tag
 echo "Creating git commit and tag..."
 git add pom.xml
-git commit -m "Release version $VERSION"
-git tag -a "v$VERSION" -m "Release $VERSION"
+git diff --cached --quiet || git commit -m "Release version $VERSION"
+git tag -a "v$VERSION" -m "Release $VERSION" 2>/dev/null || echo "Tag v$VERSION already exists, skipping..."
 
 # Push tag
 echo "Pushing tag..."
@@ -73,8 +73,8 @@ mvn -Prelease deploy -DskipTests
 echo "Setting next development version to ${NEXT_VERSION}-SNAPSHOT..."
 mvn versions:set -DnewVersion="${NEXT_VERSION}-SNAPSHOT" -DgenerateBackupPoms=false
 git add pom.xml
-git commit -m "Prepare next development version ${NEXT_VERSION}-SNAPSHOT"
-git push origin main
+git diff --cached --quiet || git commit -m "Prepare next development version ${NEXT_VERSION}-SNAPSHOT"
+git push origin main || echo "Push failed - you may need to push manually"
 
 echo ""
 echo "=== Release $VERSION completed! ==="
