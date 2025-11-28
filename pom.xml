@@ -18,9 +18,9 @@
     </properties>
 
     <scm>
-        <connection>scm:git:https://github.com/avanderheijde/mohican.git</connection>
-        <developerConnection>scm:git:git@github.com:avanderheijde/mohican.git</developerConnection>
-        <url>https://github.com/avanderheijde/mohican</url>
+        <connection>scm:git:https://github.com/mcix/mohican.git</connection>
+        <developerConnection>scm:git:git@github.com:mcix/mohican.git</developerConnection>
+        <url>https://github.com/mcix/mohican</url>
         <tag>HEAD</tag>
     </scm>
     
