@@ -7,6 +7,7 @@ import nl.bytesoflife.inspector.CanonDriverListener;
 import nl.bytesoflife.inspector.CanonDriverWrapperInterface;
 import nl.bytesoflife.inspector.CanonDriver;
 import nl.bytesoflife.inspector.CanonDriverConfiguration;
+import nl.bytesoflife.mohican.spring.SslCertificateInitializer;
 import nl.bytesoflife.mohican.spring.WebSocketConfiguration;
 import nl.bytesoflife.mohican.spring.WebEventListener;
 import nl.bytesoflife.mohican.spring.WebSocketController;
@@ -146,6 +147,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         ConfigurableApplicationContext ctx = new SpringApplicationBuilder(Mohican.class)
                 .headless(headless)
                 .addCommandLineProperties(true)
+                .initializers(new SslCertificateInitializer())
                 .sources(Mohican.class, CanonDriverConfiguration.class)
                 .run(args);
     }

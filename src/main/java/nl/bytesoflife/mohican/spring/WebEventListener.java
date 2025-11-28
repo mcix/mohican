@@ -7,6 +7,9 @@ import nl.bytesoflife.mohican.WebsocketProviderListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.MediaType;
+import org.springframework.util.StreamUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -84,7 +87,23 @@ public class WebEventListener {
 
     @RequestMapping(value = "/", method = RequestMethod.GET)
     public ResponseEntity test() {
-        return ResponseEntity.ok("Certificate OK");
+        return ResponseEntity.ok("<html><head>"
+                + "<title>DeltaProto - Mohican</title>"
+                + "<link rel=\"icon\" type=\"image/x-icon\" href=\"/favicon.ico\">"
+                + "</head><body>OK</body></html>");
+    }
+
+    @RequestMapping(value = "/favicon.ico", method = RequestMethod.GET)
+    public ResponseEntity<byte[]> favicon() {
+        try {
+            ClassPathResource resource = new ClassPathResource("favicon.ico");
+            byte[] bytes = StreamUtils.copyToByteArray(resource.getInputStream());
+            return ResponseEntity.ok()
+                    .contentType(MediaType.valueOf("image/x-icon"))
+                    .body(bytes);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @RequestMapping(value = "/mohicanreq", method = RequestMethod.POST)
