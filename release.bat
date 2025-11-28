@@ -65,4 +65,4 @@ git push origin main
 
 echo.
 echo === Release %VERSION% completed! ===
-echo GitHub Release: https://github.com/avanderheijde/mohican/releases/tag/v%VERSION%
+echo GitHub Release: https://github.com/mcix/mohican/releases/tag/v%VERSION%

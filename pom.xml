@@ -214,7 +214,7 @@
                             <description>Release ${project.version}</description>
                             <releaseName>v${project.version}</releaseName>
                             <tag>v${project.version}</tag>
-                            <repositoryId>avanderheijde/mohican</repositoryId>
+                            <repositoryId>mcix/mohican</repositoryId>
                             <!-- Use GITHUB_TOKEN environment variable -->
                             <serverId>github</serverId>
                             <fileSets>

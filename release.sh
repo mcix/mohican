@@ -78,4 +78,4 @@ git push origin main || echo "Push failed - you may need to push manually"
 
 echo ""
 echo "=== Release $VERSION completed! ==="
-echo "GitHub Release: https://github.com/avanderheijde/mohican/releases/tag/v$VERSION"
+echo "GitHub Release: https://github.com/mcix/mohican/releases/tag/v$VERSION"
