@@ -7,7 +7,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>nl.bytesoflife.mohican</groupId>
     <artifactId>Mohican2</artifactId>
-    <version>1.11-SNAPSHOT</version>
+    <version>1.11</version>
     <packaging>jar</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -215,6 +215,8 @@
                             <releaseName>v${project.version}</releaseName>
                             <tag>v${project.version}</tag>
                             <repositoryId>avanderheijde/mohican</repositoryId>
+                            <!-- Use GITHUB_TOKEN environment variable -->
+                            <serverId>github</serverId>
                             <fileSets>
                                 <fileSet>
                                     <directory>${project.build.directory}</directory>
