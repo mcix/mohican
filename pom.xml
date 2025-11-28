@@ -6,7 +6,7 @@
     
     <modelVersion>4.0.0</modelVersion>
     <groupId>nl.bytesoflife.mohican</groupId>
-    <artifactId>Mohican2</artifactId>
+    <artifactId>Mohican</artifactId>
     <version>1.11-SNAPSHOT</version>
     <packaging>jar</packaging>
     <properties>
@@ -210,6 +210,14 @@
                         <groupId>de.jutzig</groupId>
                         <artifactId>github-release-plugin</artifactId>
                         <version>1.4.0</version>
+                        <dependencies>
+                            <!-- Fix missing dependency on newer Maven versions -->
+                            <dependency>
+                                <groupId>org.codehaus.plexus</groupId>
+                                <artifactId>plexus-utils</artifactId>
+                                <version>3.5.1</version>
+                            </dependency>
+                        </dependencies>
                         <configuration>
                             <description>Release ${project.version}</description>
                             <releaseName>v${project.version}</releaseName>
