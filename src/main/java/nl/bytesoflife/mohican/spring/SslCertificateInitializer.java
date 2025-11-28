@@ -8,23 +8,21 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 
-import java.io.*;
-import java.math.BigInteger;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.*;
-import java.security.cert.Certificate;
-import java.security.cert.X509Certificate;
-import java.util.Date;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-
-import sun.security.x509.*;
 
 /**
  * Initializes SSL certificate before Spring Boot configures the web server.
  * This ensures the dynamically generated certificate is used for HTTPS.
+ * Uses keytool for certificate generation to ensure compatibility with all Java versions.
  */
 public class SslCertificateInitializer implements ApplicationContextInitializer<ConfigurableApplicationContext> {
 
@@ -48,7 +46,7 @@ public class SslCertificateInitializer implements ApplicationContextInitializer<
 
             if (!Files.exists(keystorePath)) {
                 logger.info("Keystore not found at {}, generating new self-signed certificate...", keystorePath);
-                generateCertificate(keystorePath, certPath);
+                generateCertificateWithKeytool(keystorePath, certPath);
                 installCertificateInTrustStore(certPath);
             } else {
                 logger.info("Using existing keystore at: {}", keystorePath);
@@ -87,82 +85,96 @@ public class SslCertificateInitializer implements ApplicationContextInitializer<
         }
     }
 
-    private void generateCertificate(Path keystorePath, Path certPath) throws Exception {
-        // Generate key pair
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-        keyPairGenerator.initialize(2048, new SecureRandom());
-        KeyPair keyPair = keyPairGenerator.generateKeyPair();
+    private void generateCertificateWithKeytool(Path keystorePath, Path certPath) throws Exception {
+        // Find keytool executable
+        String keytool = findKeytool();
 
-        // Generate self-signed certificate
-        X509Certificate certificate = generateSelfSignedCertificate(keyPair, HOSTNAME, VALIDITY_DAYS);
+        // Generate keystore with self-signed certificate using keytool
+        // keytool -genkeypair -alias mohican2 -keyalg RSA -keysize 2048 -validity 3650
+        //         -keystore mohican2.p12 -storetype PKCS12 -storepass deltaproto
+        //         -dname "CN=localhost, O=Mohican, L=Local, C=NL"
+        //         -ext "SAN=dns:localhost,ip:127.0.0.1"
+        List<String> genKeyCmd = new ArrayList<>();
+        genKeyCmd.add(keytool);
+        genKeyCmd.add("-genkeypair");
+        genKeyCmd.add("-alias");
+        genKeyCmd.add(CERT_ALIAS);
+        genKeyCmd.add("-keyalg");
+        genKeyCmd.add("RSA");
+        genKeyCmd.add("-keysize");
+        genKeyCmd.add("2048");
+        genKeyCmd.add("-validity");
+        genKeyCmd.add(String.valueOf(VALIDITY_DAYS));
+        genKeyCmd.add("-keystore");
+        genKeyCmd.add(keystorePath.toString());
+        genKeyCmd.add("-storetype");
+        genKeyCmd.add("PKCS12");
+        genKeyCmd.add("-storepass");
+        genKeyCmd.add(KEYSTORE_PASSWORD);
+        genKeyCmd.add("-keypass");
+        genKeyCmd.add(KEYSTORE_PASSWORD);
+        genKeyCmd.add("-dname");
+        genKeyCmd.add("CN=" + HOSTNAME + ", O=Mohican, L=Local, C=NL");
+        genKeyCmd.add("-ext");
+        genKeyCmd.add("SAN=dns:" + HOSTNAME + ",ip:127.0.0.1");
 
-        // Create keystore and store the key pair and certificate
-        KeyStore keyStore = KeyStore.getInstance("PKCS12");
-        keyStore.load(null, null);
-        keyStore.setKeyEntry(CERT_ALIAS, keyPair.getPrivate(), KEYSTORE_PASSWORD.toCharArray(),
-                new Certificate[]{certificate});
+        ProcessBuilder pb = new ProcessBuilder(genKeyCmd);
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+        String output = readProcessOutput(process);
+        int exitCode = process.waitFor();
 
-        // Save keystore to file
-        try (FileOutputStream fos = new FileOutputStream(keystorePath.toFile())) {
-            keyStore.store(fos, KEYSTORE_PASSWORD.toCharArray());
+        if (exitCode != 0) {
+            throw new RuntimeException("keytool genkeypair failed: " + output);
         }
         logger.info("Keystore created at: {}", keystorePath);
 
-        // Export certificate to file for installation
-        try (FileOutputStream fos = new FileOutputStream(certPath.toFile())) {
-            fos.write(certificate.getEncoded());
+        // Export certificate from keystore
+        // keytool -exportcert -alias mohican2 -keystore mohican2.p12 -storepass deltaproto -file mohican2.crt
+        List<String> exportCmd = new ArrayList<>();
+        exportCmd.add(keytool);
+        exportCmd.add("-exportcert");
+        exportCmd.add("-alias");
+        exportCmd.add(CERT_ALIAS);
+        exportCmd.add("-keystore");
+        exportCmd.add(keystorePath.toString());
+        exportCmd.add("-storetype");
+        exportCmd.add("PKCS12");
+        exportCmd.add("-storepass");
+        exportCmd.add(KEYSTORE_PASSWORD);
+        exportCmd.add("-file");
+        exportCmd.add(certPath.toString());
+        exportCmd.add("-rfc"); // PEM format for better compatibility
+
+        pb = new ProcessBuilder(exportCmd);
+        pb.redirectErrorStream(true);
+        process = pb.start();
+        output = readProcessOutput(process);
+        exitCode = process.waitFor();
+
+        if (exitCode != 0) {
+            throw new RuntimeException("keytool exportcert failed: " + output);
         }
         logger.info("Certificate exported to: {}", certPath);
     }
 
-    private X509Certificate generateSelfSignedCertificate(KeyPair keyPair, String hostname, int validityDays) throws Exception {
-        PrivateKey privateKey = keyPair.getPrivate();
-        X509CertInfo info = new X509CertInfo();
+    private String findKeytool() {
+        String javaHome = System.getProperty("java.home");
+        String keytool;
 
-        Date from = new Date();
-        Date to = new Date(from.getTime() + validityDays * 86400000L);
+        if (OSValidator.isWindows()) {
+            keytool = javaHome + "\\bin\\keytool.exe";
+        } else {
+            keytool = javaHome + "/bin/keytool";
+        }
 
-        CertificateValidity interval = new CertificateValidity(from, to);
-        BigInteger serialNumber = new BigInteger(64, new SecureRandom());
-        X500Name owner = new X500Name("CN=" + hostname + ", O=Mohican, L=Local, C=NL");
+        // Verify keytool exists
+        if (Files.exists(Paths.get(keytool))) {
+            return keytool;
+        }
 
-        info.set(X509CertInfo.VALIDITY, interval);
-        info.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(serialNumber));
-        info.set(X509CertInfo.SUBJECT, owner);
-        info.set(X509CertInfo.ISSUER, owner);
-        info.set(X509CertInfo.KEY, new CertificateX509Key(keyPair.getPublic()));
-        info.set(X509CertInfo.VERSION, new CertificateVersion(CertificateVersion.V3));
-
-        AlgorithmId algo = AlgorithmId.get("SHA256withRSA");
-        info.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(algo));
-
-        // Add Subject Alternative Names (SAN) for localhost
-        GeneralNames generalNames = new GeneralNames();
-        generalNames.add(new GeneralName(new DNSName(hostname)));
-        generalNames.add(new GeneralName(new DNSName("127.0.0.1")));
-        generalNames.add(new GeneralName(new IPAddressName("127.0.0.1")));
-
-        SubjectAlternativeNameExtension sanExtension = new SubjectAlternativeNameExtension(generalNames);
-        CertificateExtensions extensions = new CertificateExtensions();
-        extensions.set(SubjectAlternativeNameExtension.NAME, sanExtension);
-
-        // Add Basic Constraints extension (CA:FALSE for end-entity certificate)
-        BasicConstraintsExtension basicConstraints = new BasicConstraintsExtension(false, false, 0);
-        extensions.set(BasicConstraintsExtension.NAME, basicConstraints);
-
-        info.set(X509CertInfo.EXTENSIONS, extensions);
-
-        // Sign the certificate
-        X509CertImpl cert = new X509CertImpl(info);
-        cert.sign(privateKey, "SHA256withRSA");
-
-        // Update algorithm info after signing
-        algo = (AlgorithmId) cert.get(X509CertImpl.SIG_ALG);
-        info.set(CertificateAlgorithmId.NAME + "." + CertificateAlgorithmId.ALGORITHM, algo);
-        cert = new X509CertImpl(info);
-        cert.sign(privateKey, "SHA256withRSA");
-
-        return cert;
+        // Fall back to PATH
+        return "keytool";
     }
 
     private void installCertificateInTrustStore(Path certPath) {
