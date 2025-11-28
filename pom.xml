@@ -7,13 +7,22 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>nl.bytesoflife.mohican</groupId>
     <artifactId>Mohican2</artifactId>
-    <version>1.10</version>
+    <version>1.11-SNAPSHOT</version>
     <packaging>jar</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <!-- Release version (without -SNAPSHOT) for release builds -->
+        <release.version>1.11</release.version>
     </properties>
+
+    <scm>
+        <connection>scm:git:https://github.com/avanderheijde/mohican.git</connection>
+        <developerConnection>scm:git:git@github.com:avanderheijde/mohican.git</developerConnection>
+        <url>https://github.com/avanderheijde/mohican</url>
+        <tag>HEAD</tag>
+    </scm>
     
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -73,6 +82,43 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- Generate source JAR -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Generate source ZIP for releases -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.6.0</version>
+                <configuration>
+                    <descriptors>
+                        <descriptor>src/assembly/source.xml</descriptor>
+                    </descriptors>
+                    <finalName>${project.artifactId}-${project.version}</finalName>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>create-source-zip</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <!--<plugin>
@@ -151,6 +197,55 @@
                 </executions>
             </plugin>-->
         </plugins>
-    </build>          
-    
+    </build>
+
+    <profiles>
+        <!-- Release profile: use with mvn -Prelease deploy -->
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <!-- GitHub Release Plugin -->
+                    <plugin>
+                        <groupId>de.jutzig</groupId>
+                        <artifactId>github-release-plugin</artifactId>
+                        <version>1.4.0</version>
+                        <configuration>
+                            <description>Release ${project.version}</description>
+                            <releaseName>v${project.version}</releaseName>
+                            <tag>v${project.version}</tag>
+                            <repositoryId>avanderheijde/mohican</repositoryId>
+                            <fileSets>
+                                <fileSet>
+                                    <directory>${project.build.directory}</directory>
+                                    <includes>
+                                        <include>${project.artifactId}-${project.version}.jar</include>
+                                        <include>${project.artifactId}-${project.version}-sources.zip</include>
+                                    </includes>
+                                </fileSet>
+                            </fileSets>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>github-release</id>
+                                <phase>deploy</phase>
+                                <goals>
+                                    <goal>release</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <!-- Skip default deploy to Maven repo -->
+    <distributionManagement>
+        <repository>
+            <id>internal</id>
+            <url>file://${project.build.directory}/mvn-repo</url>
+        </repository>
+    </distributionManagement>
+
 </project>
