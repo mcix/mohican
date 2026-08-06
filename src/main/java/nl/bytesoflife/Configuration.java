@@ -261,4 +261,25 @@ public class Configuration
     public boolean getCameraSimulate() {
         return Boolean.valueOf(props.getProperty("camera.simulate", "false"));
     }
+
+    /**
+     * Which Canon driver to use: {@code jni} (legacy InspectorCamera.dll),
+     * {@code sdk} (canon-sdk-java / JNA, the only one that can serve live view)
+     * or {@code simulate}.
+     * <p>
+     * Defaults to {@code jni} <b>deliberately</b>. The shop-floor machines have no
+     * {@code camera.driver} key, so any other default would silently move
+     * production capture onto the newer driver the moment this is deployed. Set
+     * {@code camera.driver=sdk} explicitly once it has been proven against the
+     * camera — or switch at runtime from the mohican window, which does not
+     * persist and so cannot surprise the next restart.
+     * <p>
+     * {@code camera.simulate=true} still wins, so existing configs keep working.
+     */
+    public String getCameraDriver() {
+        if (getCameraSimulate()) {
+            return "simulate";
+        }
+        return props.getProperty("camera.driver", "jni").trim().toLowerCase();
+    }
 }

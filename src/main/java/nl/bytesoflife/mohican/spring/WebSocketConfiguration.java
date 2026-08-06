@@ -16,7 +16,16 @@ public class WebSocketConfiguration extends AbstractWebSocketMessageBrokerConfig
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         String[] allowedOrigins = Configuration.getInstance().getAllowedOrigins();
 
-        registry.addEndpoint("/mohican", "/").setAllowedOriginPatterns(
+        // SockJS is required, not optional: dp-3's browser client connects with
+        // `Stomp.over(() => SockJS(url))` (BomMohican.js), which first probes
+        // `/mohican/info`. Without withSockJS() that probe 404s and the browser
+        // never connects at all — taking the v1 CANON_* protocol and every motor
+        // push down with it, not just the newer camera protocol.
+        //
+        // setWebSocketEnabled(true) keeps the native WebSocket transport available
+        // inside the SockJS negotiation, so a raw-WS client still works and the
+        // frontend can migrate off sockjs-client when it wants to.
+        registry.addEndpoint("/mohican", "/sock", "/").setAllowedOriginPatterns(
             allowedOrigins
         ).withSockJS().setWebSocketEnabled(true);
     }

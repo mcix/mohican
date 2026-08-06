@@ -1,6 +1,7 @@
 package nl.bytesoflife.mohican;
 
 import nl.bytesoflife.Configuration;
+import nl.bytesoflife.inspector.CameraDriver;
 
 import javax.swing.*;
 import java.awt.*;
@@ -28,10 +29,17 @@ public class MohicanFrame extends JFrame {
     private static Integer sliderMaxX = 61600;
     private static Integer sliderDivider = 100;
 
-    public MohicanFrame(Mohican m_mohican) {
-        initUI();
+    private JComboBox<CameraDriver> driverSelector;
+    private JLabel driverStatusLabel;
+    /** Guards the selector's listener while we set it programmatically. */
+    private volatile boolean suppressDriverEvents = false;
 
+    public MohicanFrame(Mohican m_mohican) {
+        // Assign before building the UI: the camera panel's listener calls back
+        // into mohican, and initUI() used to run while the field was still null.
         mohican = m_mohican;
+
+        initUI();
 
         EventQueue.invokeLater(() -> {
             this.setVisible(true);
@@ -91,7 +99,7 @@ public class MohicanFrame extends JFrame {
         frame.add(reconnectButton);
         frame.setPreferredSize(new Dimension(200, 45));
 
-        createLayout(titleLabel, frame2, frame);
+        createLayout(titleLabel, frame2, frame, buildCameraPanel());
 
         if (Configuration.getInstance().getMotoroSimulate()) {
             DecimalFormat df = new DecimalFormat();
@@ -118,10 +126,101 @@ public class MohicanFrame extends JFrame {
         }
 
         setTitle("Mohican");
-        setSize(250, 130);
+        setSize(250, 210);
         setLocationRelativeTo(null);
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+    }
+
+    /**
+     * Camera driver selector.
+     * <p>
+     * Only one driver can hold the camera — EDSDK allows a single session per body
+     * — so this is a switch, not a set of independent toggles. Selecting an entry
+     * stops the current driver and starts the chosen one; the label underneath
+     * reports whether it actually came up, which is the point: on a Mac the JNI
+     * driver cannot load InspectorCamera.dll, and without a camera attached the
+     * SDK driver starts but never becomes ready.
+     * <p>
+     * Switching happens on a worker thread. Bringing a driver up talks to the
+     * camera over USB and can block for seconds; doing that on the EDT would
+     * freeze the window mid-switch.
+     */
+    private JPanel buildCameraPanel() {
+        JPanel panel = new JPanel(new BorderLayout(4, 2));
+        panel.setBorder(BorderFactory.createTitledBorder("Camera driver"));
+
+        driverSelector = new JComboBox<>(CameraDriver.values());
+        driverStatusLabel = new JLabel(" ", SwingConstants.CENTER);
+        driverStatusLabel.setFont(driverStatusLabel.getFont().deriveFont(Font.PLAIN, 11f));
+
+        driverSelector.addActionListener((ActionEvent event) -> {
+            if (suppressDriverEvents) {
+                return;
+            }
+            final CameraDriver selected = (CameraDriver) driverSelector.getSelectedItem();
+            if (selected == null || mohican == null) {
+                return;
+            }
+            driverSelector.setEnabled(false);
+            driverStatusLabel.setText("switching to " + selected.getId() + "…");
+            new Thread(() -> {
+                boolean ready = false;
+                String failure = null;
+                try {
+                    ready = mohican.selectCameraDriver(selected);
+                } catch (Throwable t) {
+                    // Never let a driver failure kill the UI thread that owns the
+                    // selector — the operator needs it to switch back.
+                    failure = t.getMessage();
+                } finally {
+                    final boolean up = ready;
+                    final String failed = failure;
+                    // All Swing touches on the EDT — this runs on the switch thread.
+                    SwingUtilities.invokeLater(() -> {
+                        driverSelector.setEnabled(true);
+                        if (failed != null) {
+                            suppressDriverEvents = true;
+                            try {
+                                driverSelector.setSelectedItem(selected);
+                            } finally {
+                                suppressDriverEvents = false;
+                            }
+                            driverStatusLabel.setText("failed: " + failed);
+                        } else {
+                            setCameraDriverStatus(selected, up);
+                        }
+                    });
+                }
+            }, "camera-driver-switch").start();
+        });
+
+        panel.add(driverSelector, BorderLayout.CENTER);
+        panel.add(driverStatusLabel, BorderLayout.SOUTH);
+        panel.setPreferredSize(new Dimension(200, 70));
+        return panel;
+    }
+
+    /** Reflect the active driver without re-triggering the switch listener. */
+    public void setCameraDriverStatus(CameraDriver driver, boolean ready) {
+        SwingUtilities.invokeLater(() -> {
+            if (driverSelector == null) {
+                return;
+            }
+            suppressDriverEvents = true;
+            try {
+                if (driver != null && driverSelector.getSelectedItem() != driver) {
+                    driverSelector.setSelectedItem(driver);
+                }
+            } finally {
+                suppressDriverEvents = false;
+            }
+            if (driver == null) {
+                driverStatusLabel.setText("no driver active");
+            } else {
+                driverStatusLabel.setText(ready ? "● ready" : "○ not ready");
+            }
+        });
     }
 
     private void createLayout(Container... arg) {
@@ -133,15 +232,11 @@ public class MohicanFrame extends JFrame {
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.gridwidth = 2;
-        pane.add(arg[0], gbc);
 
-        gbc.gridwidth = 2;
-        gbc.gridy = 1;
-        pane.add(arg[1], gbc);
-
-        gbc.gridwidth = 2;
-        gbc.gridy = 2;
-        pane.add(arg[2], gbc);
+        for (int i = 0; i < arg.length; i++) {
+            gbc.gridy = i;
+            pane.add(arg[i], gbc);
+        }
     }
 
     public void setTitleLabel(String val) {

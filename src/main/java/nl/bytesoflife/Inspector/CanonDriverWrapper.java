@@ -43,12 +43,25 @@ public class CanonDriverWrapper implements CanonDriverWrapperInterface {
         }
     }
 
-    @EventListener(ApplicationReadyEvent.class)
-    public synchronized void runAfterStartup() {
+    private volatile boolean ready = false;
+
+    /**
+     * Started explicitly by CameraDriverRegistry rather than from an
+     * ApplicationReadyEvent, so only the selected driver ever claims the camera.
+     */
+    public synchronized void start() {
         executorService.submit(() -> {
-            logger.info("Running after startup");
-            canonDriver = new CanonDriver();
-            canonDriver.loadLibrary();
+            logger.info("Starting JNI Canon driver");
+            try {
+                canonDriver = new CanonDriver();
+                canonDriver.loadLibrary();
+            } catch (Throwable t) {
+                // UnsatisfiedLinkError on any machine without InspectorCamera.dll
+                // (i.e. everything that is not the Windows shop-floor PC).
+                logger.error("Failed to load InspectorCamera native library", t);
+                canonDriver = null;
+                return;
+            }
             int initRes = canonDriver.init();
             if( initRes != 0 ) {
                 logger.error("Failed to initialize CanonDriver");
@@ -60,8 +73,33 @@ public class CanonDriverWrapper implements CanonDriverWrapperInterface {
                 return;
             }
 
+            ready = true;
             handleConnect();
         });
+    }
+
+    public synchronized void stop() {
+        if (canonDriver == null) {
+            return;
+        }
+        try {
+            // Bounded: a hung JNI call must not hold the caller (the registry, which
+            // is switching away from this driver) forever.
+            executorService.submit(() -> {
+                canonDriver.closeSession();
+                canonDriver.terminate();
+                return null;
+            }).get(10, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception e) {
+            logger.warn("Failed to stop JNI Canon driver cleanly", e);
+        } finally {
+            ready = false;
+            handleDisconnect();
+        }
+    }
+
+    public boolean isReady() {
+        return ready && canonDriver != null;
     }
 
 

@@ -75,6 +75,18 @@
             <version>2.9.3</version>
         </dependency>
 
+        <!-- Pure-Java EDSDK bindings (JNA) — our fork of Blackdread/canon-sdk-java,
+             carrying macOS support and the EDSDK 13.20.10 bindings. See
+             nl.bytesoflife.inspector.sdk. Built with <release>8</release> so it
+             stays loadable on this module's 1.8 target.
+             Source: https://github.com/mcix/canon-sdk-java (branch: deltaproto).
+             Not on Maven Central — build it with `mvn install`. -->
+        <dependency>
+            <groupId>nl.bytesoflife</groupId>
+            <artifactId>camera-framework</artifactId>
+            <version>1.3.0-SNAPSHOT</version>
+        </dependency>
+
     </dependencies>
 
     <build>

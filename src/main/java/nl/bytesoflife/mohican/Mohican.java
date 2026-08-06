@@ -7,6 +7,9 @@ import nl.bytesoflife.inspector.CanonDriverListener;
 import nl.bytesoflife.inspector.CanonDriverWrapperInterface;
 import nl.bytesoflife.inspector.CanonDriver;
 import nl.bytesoflife.inspector.CanonDriverConfiguration;
+import nl.bytesoflife.inspector.CameraDriver;
+import nl.bytesoflife.inspector.CameraDriverRegistry;
+import nl.bytesoflife.inspector.protocol.CameraCommandService;
 import nl.bytesoflife.mohican.spring.SslCertificateInitializer;
 import nl.bytesoflife.mohican.spring.WebSocketConfiguration;
 import nl.bytesoflife.mohican.spring.WebEventListener;
@@ -60,6 +63,18 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     @Autowired
     private CanonDriverWrapperInterface canonDriverWrapper;
 
+    @Autowired
+    private CameraDriverRegistry cameraDriverRegistry;
+
+    /**
+     * Routes every command to a per-category worker so nothing runs on the thread
+     * that delivered it. Motion, camera and device each get their own queue.
+     */
+    private final MessageDispatcher messageDispatcher = new MessageDispatcher();
+
+    /** v2 camera protocol. Shares the dispatcher's camera queue with the v1 CANON_* cases. */
+    private CameraCommandService cameraCommandService;
+
     //private CanonDriver canonDriver;
 
     @Autowired
@@ -83,6 +98,38 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         webSocketController.addReduxEventListener(this);
 
         canonDriverWrapper.addListener(this);
+
+        cameraCommandService = new CameraCommandService(
+                cameraDriverRegistry, canonDriverWrapper, this::sendMessage,
+                messageDispatcher.cameraExecutor(),
+                () -> MessageDispatcher.isOn(MessageDispatcher.Category.CAMERA));
+
+        // Keep the UI selector honest when the driver changes from anywhere other
+        // than the selector itself — startup, or a CAMERA_COMMAND selectDriver.
+        cameraDriverRegistry.addChangeListener(driver ->
+                withUi(ui -> ui.setCameraDriverStatus(driver, canonDriverWrapper.isReady())));
+    }
+
+    /**
+     * Drop the command workers on shutdown. Queued-but-unstarted commands are
+     * discarded rather than drained — on the way down there is nobody left to
+     * receive their results, and draining a camera queue could block the shutdown
+     * behind a slow capture.
+     */
+    @javax.annotation.PreDestroy
+    public void shutdownDispatcher() {
+        messageDispatcher.shutdown();
+    }
+
+    /**
+     * Switch the active camera driver. Called by the UI selector and mirrored by
+     * the {@code selectDriver} op of the v2 protocol.
+     *
+     * @return true if the driver came up ready
+     */
+    public boolean selectCameraDriver(CameraDriver driver) {
+        logger.info("Switching camera driver to {}", driver.getId());
+        return cameraDriverRegistry.activate(driver);
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -222,7 +269,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
             @Override
             public void homingFinished() {
-                mohicanFrame.setTitleLabel("Homing X axis finished");
+                withUi(ui -> ui.setTitleLabel("Homing X axis finished"));
             }
         };
 
@@ -268,7 +315,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
             @Override
             public void homingFinished() {
-                mohicanFrame.setTitleLabel("Homing Y axis finished");
+                withUi(ui -> ui.setTitleLabel("Homing Y axis finished"));
             }
         };
 
@@ -325,10 +372,28 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 
     @Override
     public void onMessage(ReduxAction action) {
+        // Hand off to the worker for this command's category and return, so no
+        // command runs on the thread that delivered it (a Tomcat request thread,
+        // or the STOMP message thread). See MessageDispatcher for why the
+        // categories are separate single threads rather than one pool.
+        messageDispatcher.dispatch(action, this::handleMessage);
+    }
+
+    private void handleMessage(ReduxAction action) {
         logger.info("onMessage " + action.getType());
 
         try {
             switch (action.getType()) {
+                // --- v2 camera protocol -------------------------------------
+                // One envelope for every camera operation, answered by a
+                // CAMERA_RESULT carrying the caller's request id. Queued to a
+                // worker so this method returns straight away; see
+                // docs/CAMERA_PROTOCOL.md.
+                case CameraCommandService.COMMAND_TYPE: {
+                    cameraCommandService.submit(action.getValue());
+                    break;
+                }
+                // --- v1 protocol (CANON_*, motors, …) ------------------------
                 case "POSITION_TIMEOUT": {
                     Integer delayMs = (Integer) action.getValue();
                     setPositionTimeOut(delayMs);
@@ -435,7 +500,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     } else {
                         erosController.home(null, 0, 0);
                     }
-                    mohicanFrame.setTitleLabel("Homing...");
+                    withUi(ui -> ui.setTitleLabel("Homing..."));
                     break;
                 }
                 case "MESSAGE": {
@@ -448,10 +513,15 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                             logger.error("Error casting action value: " + e.getMessage(), e);
                         }
                     }
+                    // Was missing: MESSAGE fell through GET_VERSION into
+                    // CANON_REINITIALIZE, so every device message also re-opened
+                    // the camera session.
+                    break;
                 }
                 case "GET_VERSION": {
                     String javaVersion = System.getProperty("java.version");
                     sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).versions(erosController.getVersion()).build());
+                    break;
                 }
 
                 case "CANON_REINITIALIZE": {
@@ -470,6 +540,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     sendMessage("CANON_ISO_OPTIONS", canonDriverWrapper.getListOfIsoOptions());
                     sendMessage("CANON_SHUTTERSPEED_OPTIONS", canonDriverWrapper.getShutterSpeedOptions());
                     sendMessage("CANON_QUALITY_OPTIONS", canonDriverWrapper.getImageQualityOptions());
+                    // Was missing: fell through into CANON_GET_ALL_CURRENT_SETTINGS.
+                    break;
                 }
 
                 case "CANON_GET_ALL_CURRENT_SETTINGS": {
@@ -589,8 +661,10 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     break;
                 }
                 case "CANON_GET_IMAGE_INFO": {
-                    canonDriverWrapper.closeSession();
-                    canonDriverWrapper.openSession();
+                    // No explicit close/open here: every driver's getAllImageInfo
+                    // already rebuilds the session itself, because EDSDK snapshots
+                    // the card's directory tree when the session opens. Doing it
+                    // here as well meant two full rebuilds per listing.
                     String[] allImageInfo = canonDriverWrapper.getAllImageInfo();
                     sendMessage("CANON_GET_IMAGE_INFO", allImageInfo);
                     break;
@@ -719,7 +793,10 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             }
 
         } catch (Exception e) {
-            logger.warn("Failed to parse message " + action.getType() + " " + action.getValue());
+            // Log the cause, not just the message. Without the stack this swallowed
+            // every handler failure identically — a cast error and a dead camera
+            // looked the same in the log.
+            logger.warn("Failed to handle message " + action.getType() + " " + action.getValue(), e);
         }
     }
 
@@ -736,7 +813,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
 //
 //        }
 
-        mohicanFrame.setWebsocketStatus(true);
+        withUi(ui -> ui.setWebsocketStatus(true));
     }
 
     @Override
@@ -747,23 +824,58 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             executor.shutdown();
         }
 
-        mohicanFrame.setWebsocketStatus(false);
+        withUi(ui -> ui.setWebsocketStatus(false));
     }
 
     @Override
     public void onCameraConnect() {
         logger.info("onCameraConnect");
-        mohicanFrame.setTitleLabel("Camera connected");
+        withUi(ui -> ui.setTitleLabel("Camera connected"));
+        publishCameraEvent("connected");
     }
 
     @Override
     public void onCameraDisconnect() {
         logger.info("onCameraDisconnect");
+        withUi(ui -> ui.setTitleLabel("Camera disconnected"));
+        publishCameraEvent("disconnected");
     }
 
     @Override
     public void onCameraPictureTaken() {
         logger.info("onCameraPictureTaken");
+        publishCameraEvent("pictureTaken");
+    }
+
+    /**
+     * Run a UI update if there is a UI.
+     * <p>
+     * mohican runs headless on the shop-floor boxes ({@code -h}), where
+     * {@code mohicanFrame} is null. Several call sites used to dereference it
+     * unguarded — including inside {@code onMessage} (the HOME command) and
+     * {@code onCameraConnect} — so a headless instance would NPE mid-message and
+     * drop the command. Message handling must never depend on a window existing.
+     * <p>
+     * MohicanFrame's own setters already hop to the EDT, so this only guards
+     * presence, not thread affinity.
+     */
+    private void withUi(java.util.function.Consumer<MohicanFrame> update) {
+        final MohicanFrame frame = mohicanFrame;
+        if (frame == null) {
+            return;
+        }
+        try {
+            update.accept(frame);
+        } catch (Exception e) {
+            // A broken UI update must never fail the command that triggered it.
+            logger.warn("UI update failed", e);
+        }
+    }
+
+    private void publishCameraEvent(String event) {
+        if (cameraCommandService != null) {
+            cameraCommandService.publishEvent(event, null);
+        }
     }
 
     void reInitialize() {

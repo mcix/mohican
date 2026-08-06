@@ -5,14 +5,23 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface {
+public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface, CanonLiveViewSource {
 
     private static final Logger logger = LoggerFactory.getLogger(SimulatedCanonDriverWrapper.class);
 
@@ -22,10 +31,11 @@ public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface 
     // Simulated camera state
     private boolean isInitialized = false;
     private boolean isSessionOpen = false;
-    private int currentAperture = 2;
-    private int currentIso = 100;
-    private int currentShutterSpeed = 8;
-    private int currentImageQuality = 4;
+    private int currentAperture = 2;   // index into APERTURES
+    private int currentIso = 0;        // index into ISO_SPEEDS
+    private int currentShutterSpeed = 3; // index into SHUTTER_SPEEDS
+    private int currentImageQuality = 2; // index into IMAGE_QUALITIES
+    private int currentWhiteBalance = 0;  // index into WHITE_BALANCES
     private int photoCounter = 0;
 
     public void addListener(CanonDriverListener listener) {
@@ -50,14 +60,28 @@ public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface 
         }
     }
 
-    @EventListener(ApplicationReadyEvent.class)
-    public synchronized void runAfterStartup() {
+    /** Started explicitly by CameraDriverRegistry — see CanonDriverWrapperInterface#start. */
+    public synchronized void start() {
         executorService.submit(() -> {
-            logger.info("Running simulated camera after startup");
+            logger.info("Starting simulated camera");
             isInitialized = true;
             isSessionOpen = true;
             handleConnect();
         });
+    }
+
+    public synchronized void stop() {
+        executorService.submit(() -> {
+            logger.info("Stopping simulated camera");
+            isSessionOpen = false;
+            isInitialized = false;
+            liveViewConsumers.set(0);
+            handleDisconnect();
+        });
+    }
+
+    public boolean isReady() {
+        return isInitialized && isSessionOpen;
     }
 
     public synchronized int init() throws ExecutionException, InterruptedException {
@@ -170,18 +194,45 @@ public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface 
         }).get();
     }
 
+    // Option lists use the "<index>:<label>" contract that CanonManager.js parses
+    // with parseInt(v.split(':')[0]) and posts back as CANON_SET_*. Emitting a bare
+    // label made that parse NaN, so simulated settings never actually changed.
+
+    private static final String[] SHUTTER_SPEEDS =
+            {"1/30", "1/60", "1/125", "1/250", "1/500", "1/1000", "1/2000", "1/4000"};
+    private static final String[] WHITE_BALANCES =
+            {"Auto", "Daylight", "Cloudy", "Tungsten", "Fluorescent"};
+    private static final String[] ISO_SPEEDS =
+            {"100", "200", "400", "800", "1600", "3200", "6400"};
+    private static final String[] APERTURES =
+            {"f/1.4", "f/2.0", "f/2.8", "f/4.0", "f/5.6", "f/8.0", "f/11", "f/16"};
+    private static final String[] IMAGE_QUALITIES =
+            {"RAW", "RAW+JPEG", "JPEG Fine", "JPEG Normal", "JPEG Basic"};
+
+    private static String[] optionsOf(String[] labels) {
+        String[] result = new String[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            result[i] = i + ":" + labels[i];
+        }
+        return result;
+    }
+
+    private static String optionAt(String[] labels, int index) {
+        int clamped = Math.max(0, Math.min(index, labels.length - 1));
+        return clamped + ":" + labels[clamped];
+    }
+
     public synchronized String[] getShutterSpeedOptions() throws ExecutionException, InterruptedException {
         return executorService.submit(() -> {
             logger.info("Simulated camera getShutterSpeedOptions");
-            return new String[]{"1/30", "1/60", "1/125", "1/250", "1/500", "1/1000", "1/2000", "1/4000"};
+            return optionsOf(SHUTTER_SPEEDS);
         }).get();
     }
 
     public synchronized String getCurrentShutterSpeed() throws ExecutionException, InterruptedException {
         return executorService.submit(() -> {
             logger.info("Simulated camera getCurrentShutterSpeed");
-            String[] options = {"1/30", "1/60", "1/125", "1/250", "1/500", "1/1000", "1/2000", "1/4000"};
-            return options[Math.min(currentShutterSpeed, options.length - 1)];
+            return optionAt(SHUTTER_SPEEDS, currentShutterSpeed);
         }).get();
     }
 
@@ -189,27 +240,28 @@ public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface 
         return executorService.submit(() -> {
             logger.info("Simulated camera setShutterSpeed: " + shutterSpeed);
             currentShutterSpeed = shutterSpeed;
-            return getCurrentShutterSpeed();
+            return optionAt(SHUTTER_SPEEDS, currentShutterSpeed);
         }).get();
     }
 
     public synchronized String[] getListOfWhiteBalanceOptions() throws ExecutionException, InterruptedException {
         return executorService.submit(() -> {
             logger.info("Simulated camera getListOfWhiteBalanceOptions");
-            return new String[]{"Auto", "Daylight", "Cloudy", "Tungsten", "Fluorescent"};
+            return optionsOf(WHITE_BALANCES);
         }).get();
     }
 
     public synchronized String getWhiteBalanceSetting() throws ExecutionException, InterruptedException {
         return executorService.submit(() -> {
             logger.info("Simulated camera getWhiteBalanceSetting");
-            return "Auto";
+            return optionAt(WHITE_BALANCES, currentWhiteBalance);
         }).get();
     }
 
     public synchronized int setWhiteBalance(int whiteBalance) throws ExecutionException, InterruptedException {
         return executorService.submit(() -> {
             logger.info("Simulated camera setWhiteBalance: " + whiteBalance);
+            currentWhiteBalance = whiteBalance;
             return 0; // Success
         }).get();
     }
@@ -217,15 +269,14 @@ public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface 
     public synchronized String[] getListOfIsoOptions() throws ExecutionException, InterruptedException {
         return executorService.submit(() -> {
             logger.info("Simulated camera getListOfIsoOptions");
-            return new String[]{"100", "200", "400", "800", "1600", "3200", "6400"};
+            return optionsOf(ISO_SPEEDS);
         }).get();
     }
 
     public synchronized String getIsoSetting() throws ExecutionException, InterruptedException {
         return executorService.submit(() -> {
             logger.info("Simulated camera getIsoSetting");
-            String[] options = {"100", "200", "400", "800", "1600", "3200", "6400"};
-            return options[Math.min(currentIso / 100 - 1, options.length - 1)];
+            return optionAt(ISO_SPEEDS, currentIso);
         }).get();
     }
 
@@ -240,15 +291,14 @@ public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface 
     public synchronized String[] getListOfApertureOptions() throws ExecutionException, InterruptedException {
         return executorService.submit(() -> {
             logger.info("Simulated camera getListOfApertureOptions");
-            return new String[]{"f/1.4", "f/2.0", "f/2.8", "f/4.0", "f/5.6", "f/8.0", "f/11", "f/16"};
+            return optionsOf(APERTURES);
         }).get();
     }
 
     public synchronized String getApertureSetting() throws ExecutionException, InterruptedException {
         return executorService.submit(() -> {
             logger.info("Simulated camera getApertureSetting");
-            String[] options = {"f/1.4", "f/2.0", "f/2.8", "f/4.0", "f/5.6", "f/8.0", "f/11", "f/16"};
-            return options[Math.min(currentAperture - 1, options.length - 1)];
+            return optionAt(APERTURES, currentAperture);
         }).get();
     }
 
@@ -263,15 +313,14 @@ public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface 
     public synchronized String[] getImageQualityOptions() throws ExecutionException, InterruptedException {
         return executorService.submit(() -> {
             logger.info("Simulated camera getImageQualityOptions");
-            return new String[]{"RAW", "RAW+JPEG", "JPEG Fine", "JPEG Normal", "JPEG Basic"};
+            return optionsOf(IMAGE_QUALITIES);
         }).get();
     }
 
     public synchronized String getCurrentImageQuality() throws ExecutionException, InterruptedException {
         return executorService.submit(() -> {
             logger.info("Simulated camera getCurrentImageQuality");
-            String[] options = {"RAW", "RAW+JPEG", "JPEG Fine", "JPEG Normal", "JPEG Basic"};
-            return options[Math.min(currentImageQuality, options.length - 1)];
+            return optionAt(IMAGE_QUALITIES, currentImageQuality);
         }).get();
     }
 
@@ -282,4 +331,64 @@ public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface 
             return 0; // Success
         }).get();
     }
-} 
+
+    // --- simulated live view ---------------------------------------------
+    // Exists so the protofoto live view UI can be driven end-to-end on a machine
+    // with no camera attached. Frames are synthetic but they move, which is what
+    // CanonLiveView.jsx's pixel-sampling staleness detector looks for.
+
+    private final AtomicInteger liveViewConsumers = new AtomicInteger(0);
+    private final AtomicInteger frameCounter = new AtomicInteger(0);
+
+    @Override
+    public void acquireLiveView() {
+        if (liveViewConsumers.incrementAndGet() == 1) {
+            logger.info("Simulated live view started");
+        }
+    }
+
+    @Override
+    public void releaseLiveView() {
+        if (liveViewConsumers.get() <= 0) {
+            return;
+        }
+        if (liveViewConsumers.decrementAndGet() == 0) {
+            logger.info("Simulated live view stopped");
+        }
+    }
+
+    @Override
+    public byte[] nextLiveViewFrame() {
+        if (liveViewConsumers.get() <= 0) {
+            return null;
+        }
+        final int frame = frameCounter.getAndIncrement();
+        final BufferedImage image = new BufferedImage(640, 426, BufferedImage.TYPE_INT_RGB);
+        final Graphics2D g = image.createGraphics();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(new Color(24, 32, 40));
+            g.fillRect(0, 0, 640, 426);
+
+            // Sweeping bar: guarantees the sampled pixel changes between frames.
+            final int x = (int) (320 + 260 * Math.sin(frame / 12.0));
+            g.setColor(new Color(80, 200, 120));
+            g.fillRect(x - 20, 0, 40, 426);
+
+            g.setColor(Color.WHITE);
+            g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+            g.drawString("SIMULATED LIVE VIEW", 24, 40);
+            g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 16));
+            g.drawString("frame " + frame, 24, 68);
+
+            final ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ImageIO.write(image, "jpeg", out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            logger.warn("Failed to render simulated live view frame", e);
+            return null;
+        } finally {
+            g.dispose();
+        }
+    }
+}
