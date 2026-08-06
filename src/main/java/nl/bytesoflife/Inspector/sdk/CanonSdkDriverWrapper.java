@@ -5,8 +5,11 @@ import org.blackdread.camerabinding.jna.EdsFocusShiftSet;
 import nl.bytesoflife.inspector.CanonDriver;
 import nl.bytesoflife.inspector.CanonDriverListener;
 import nl.bytesoflife.inspector.CanonDriverWrapperInterface;
+import nl.bytesoflife.inspector.CanonAutoFocusSource;
 import nl.bytesoflife.inspector.CanonLiveViewSource;
 import org.blackdread.camerabinding.jna.EdsdkLibrary.EdsCameraRef;
+import org.blackdread.camerabinding.jna.EdsPoint;
+import org.blackdread.camerabinding.jna.EdsSize;
 import org.blackdread.cameraframework.api.CallableCommand;
 import org.blackdread.cameraframework.api.camera.CanonCamera;
 import org.blackdread.cameraframework.api.command.CanonCommand;
@@ -14,6 +17,8 @@ import org.blackdread.cameraframework.api.command.TerminateSdkCommand;
 import org.blackdread.cameraframework.api.command.builder.ShootOption;
 import org.blackdread.cameraframework.api.command.builder.ShootOptionBuilder;
 import org.blackdread.cameraframework.api.constant.EdsAv;
+import org.blackdread.cameraframework.api.constant.EdsCameraCommand;
+import org.blackdread.cameraframework.api.constant.EdsEvfAf;
 import org.blackdread.cameraframework.api.constant.EdsEvfOutputDevice;
 import org.blackdread.cameraframework.api.constant.EdsISOSpeed;
 import org.blackdread.cameraframework.api.constant.EdsObjectEvent;
@@ -27,6 +32,8 @@ import org.blackdread.cameraframework.api.constant.EdsdkError;
 import org.blackdread.cameraframework.api.constant.NativeEnum;
 import org.blackdread.cameraframework.api.helper.factory.CanonFactory;
 import org.blackdread.cameraframework.api.helper.initialisation.FrameworkInitialisation;
+import org.blackdread.cameraframework.api.helper.logic.LiveViewReference;
+import org.blackdread.cameraframework.util.ErrorUtil;
 import org.blackdread.cameraframework.api.helper.logic.event.CameraAddedListener;
 import org.blackdread.cameraframework.api.helper.logic.event.CameraObjectListener;
 import org.blackdread.cameraframework.api.helper.logic.event.CameraStateListener;
@@ -38,6 +45,8 @@ import org.springframework.context.event.EventListener;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CompletionException;
@@ -68,7 +77,7 @@ import java.util.function.Function;
  * that with its {@code CommandDispatcher}, so every SDK touch here goes through
  * {@link #submit} rather than a local executor.
  */
-public class CanonSdkDriverWrapper implements CanonDriverWrapperInterface, CanonLiveViewSource {
+public class CanonSdkDriverWrapper implements CanonDriverWrapperInterface, CanonLiveViewSource, CanonAutoFocusSource {
 
     private static final Logger logger = LoggerFactory.getLogger(CanonSdkDriverWrapper.class);
 
@@ -108,6 +117,13 @@ public class CanonSdkDriverWrapper implements CanonDriverWrapperInterface, Canon
 
     /** Set while a capture is in flight; counted down by the DirItemCreated event. */
     private final AtomicReference<CountDownLatch> pendingCapture = new AtomicReference<>();
+
+    /** Set while an auto-focus is in flight; counted down by the AfResult event. */
+    private final AtomicReference<CountDownLatch> pendingAf = new AtomicReference<>();
+    private final AtomicReference<Long> lastAfResult = new AtomicReference<>();
+
+    /** How long to wait for the lens to report back before releasing AF. */
+    private static final long AF_RESULT_TIMEOUT_MS = 2500;
 
     /**
      * How long to let the camera write a shot before touching the card. Covers a
@@ -214,6 +230,109 @@ public class CanonSdkDriverWrapper implements CanonDriverWrapperInterface, Canon
         for (CanonDriverListener listener : listeners) {
             listener.onCameraPictureTaken();
         }
+    }
+
+    /**
+     * Auto-focus on a point of the live view image.
+     *
+     * @param nx horizontal position, 0..1 across the live view frame
+     * @param ny vertical position, 0..1 down the live view frame
+     * @return what happened, for the caller to turn into UI
+     */
+    @Override
+    public Map<String, Object> focusAt(final double nx, final double ny) throws Exception {
+        if (!requireSession()) {
+            throw new IllegalStateException("No camera session open");
+        }
+        if (!liveViewRunning) {
+            // The AF frame is a live-view concept: without EVF running there is no
+            // coordinate system to place it in and the camera ignores the command.
+            throw new IllegalStateException("Live view must be running to focus on a point");
+        }
+
+        final double cx = Math.max(0.0, Math.min(1.0, nx));
+        final double cy = Math.max(0.0, Math.min(1.0, ny));
+
+        final CountDownLatch afDone = new CountDownLatch(1);
+        lastAfResult.set(null);
+        pendingAf.set(afDone);
+        try {
+            return submit(() -> {
+                // The coordinate system lives on the EVF *image*, not the camera ref
+                // — asking the camera ref returns nothing useful. It is also not the
+                // same as the JPEG's pixel size, which is why the caller sends a
+                // fraction and we scale here rather than trusting client pixels.
+                final EdsSize coord;
+                try (LiveViewReference lv =
+                             CanonFactory.liveViewLogic().getLiveViewImageReference(cameraRef)) {
+                    coord = CanonFactory.propertyGetShortcutLogic()
+                            .getEvfCoordinateSystem(lv.getImageRef().getValue());
+                }
+
+                final EdsPoint.ByValue point = new EdsPoint.ByValue();
+                point.x = (int) Math.round(cx * coord.width);
+                point.y = (int) Math.round(cy * coord.height);
+
+                final EdsdkError placed = ErrorUtil.toEdsdkError(
+                        CanonFactory.edsdkLibrary().EdsSetFramePoint(cameraRef, point, false));
+                if (placed != EdsdkError.EDS_ERR_OK) {
+                    throw placed.getException();
+                }
+
+                final EdsdkError started = ErrorUtil.toEdsdkError(
+                        CanonFactory.edsdkLibrary().EdsSendCommand(cameraRef,
+                                EdsCameraCommand.kEdsCameraCommand_DoEvfAf.value(),
+                                EdsEvfAf.kEdsCameraCommand_EvfAf_ON.value()));
+
+                // Give the lens a moment, then release AF. Leaving DoEvfAf ON holds
+                // the lens driving and the next shot then reports the camera busy.
+                boolean signalled = false;
+                try {
+                    signalled = afDone.await(AF_RESULT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                ErrorUtil.toEdsdkError(CanonFactory.edsdkLibrary().EdsSendCommand(cameraRef,
+                        EdsCameraCommand.kEdsCameraCommand_DoEvfAf.value(),
+                        EdsEvfAf.kEdsCameraCommand_EvfAf_OFF.value()));
+
+                final Map<String, Object> result = new LinkedHashMap<>();
+                // The command's return code is the only signal whose meaning is
+                // documented, so it decides focused/not. kEdsStateEvent_AfResult is
+                // reported raw alongside it: the API reference does not specify its
+                // payload, so guessing a polarity would be worse than saying what we
+                // saw. Once its meaning is confirmed on the R8 this can tighten.
+                result.put("focused", started == EdsdkError.EDS_ERR_OK);
+                result.put("code", started.value());
+                result.put("reason", started == EdsdkError.EDS_ERR_OK ? null : started.name());
+                result.put("afResultSignalled", signalled);
+                result.put("afResultRaw", lastAfResult.get());
+                result.put("x", cx);
+                result.put("y", cy);
+                result.put("coordinateSystem", coordMap(coord));
+                result.put("point", pointMap(point));
+                if (started != EdsdkError.EDS_ERR_OK) {
+                    logger.info("Auto-focus at ({}, {}) did not lock: {}", cx, cy, started);
+                }
+                return result;
+            });
+        } finally {
+            pendingAf.set(null);
+        }
+    }
+
+    private static Map<String, Object> coordMap(final EdsSize size) {
+        final Map<String, Object> m = new LinkedHashMap<>();
+        m.put("width", size.width);
+        m.put("height", size.height);
+        return m;
+    }
+
+    private static Map<String, Object> pointMap(final EdsPoint point) {
+        final Map<String, Object> m = new LinkedHashMap<>();
+        m.put("x", point.x);
+        m.put("y", point.y);
+        return m;
     }
 
     /**
@@ -430,6 +549,15 @@ public class CanonSdkDriverWrapper implements CanonDriverWrapperInterface, Canon
             };
             cameraStateListener = event -> {
                 logger.debug("State event: {}", event);
+                if (event.getStateEvent() == EdsStateEvent.kEdsStateEvent_AfResult) {
+                    // Undocumented payload ("Not specified in API Reference"), so we
+                    // record it rather than interpret it — see focusAt().
+                    lastAfResult.set(event.getEventData());
+                    final CountDownLatch latch = pendingAf.get();
+                    if (latch != null) {
+                        latch.countDown();
+                    }
+                }
                 if (event.getStateEvent() == EdsStateEvent.kEdsStateEvent_Shutdown) {
                     // The camera is telling us it is going away — powered off, USB
                     // pulled, or auto-power-off. This is the only prompt notice we

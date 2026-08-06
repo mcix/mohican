@@ -206,6 +206,46 @@ the value read back from the camera afterwards.
 The camera stacks the burst itself and writes **one composite JPEG** to the card. That is
 why capture always reads back off the card rather than streaming to the host.
 
+#### Auto focus
+
+`autoFocus` focuses on a point of the live view.
+
+| arg | meaning |
+|---|---|
+| `x` | horizontal position, **0..1** across the live view frame |
+| `y` | vertical position, **0..1** down the frame |
+
+Fractions, not pixels: the camera's EVF coordinate system is neither the JPEG's
+pixel size nor the same across bodies, so mohican reads it and scales for you.
+Out-of-range values are rejected rather than clamped.
+
+**Live view must be running** — the AF frame is a live-view concept, and without
+EVF there is no coordinate system to place it in. Otherwise you get
+`Live view must be running to focus on a point`.
+
+Returns:
+
+```json
+{ "focused": true, "code": 0, "reason": null,
+  "x": 0.42, "y": 0.61,
+  "afResultSignalled": true, "afResultRaw": 0,
+  "coordinateSystem": { "width": 1024, "height": 680 },
+  "point": { "x": 430, "y": 415 } }
+```
+
+Use **`focused`** to drive the UI. It comes from the return code of
+`EdsSendCommand(DoEvfAf, ON)`, which is the only signal whose meaning EDSDK
+documents. `afResultRaw` is the payload of the `kEdsStateEvent_AfResult` event,
+reported verbatim because the API reference lists that event as "not specified" —
+its polarity is unverified, so it is exposed rather than interpreted. If it turns
+out to be reliable on our bodies, `focused` can start using it.
+
+`status` reports `autoFocusSupported`. Only the `sdk` and `simulate` drivers can
+do this; `jni` cannot.
+
+> The simulator deliberately reports failure near the frame edges (outside
+> 0.1–0.9) so the UI's failed-focus state is reachable without a camera.
+
 #### Live view
 
 `liveViewStatus` returns `{liveViewSupported, liveViewMjpeg, liveViewJpeg}`. The frames

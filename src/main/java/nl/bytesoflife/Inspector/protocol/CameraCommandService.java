@@ -4,6 +4,8 @@ import nl.bytesoflife.inspector.CameraDriver;
 import nl.bytesoflife.inspector.CameraDriverRegistry;
 import nl.bytesoflife.inspector.CanonDriver;
 import nl.bytesoflife.inspector.CanonDriverWrapperInterface;
+import nl.bytesoflife.inspector.CanonAutoFocusSource;
+import nl.bytesoflife.inspector.DelegatingCanonDriverWrapper;
 import nl.bytesoflife.inspector.CanonLiveViewSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -228,6 +230,21 @@ public class CameraCommandService {
                 return intResult(id, op, driver.setFocusBracketing(set));
             }
 
+            // --- auto focus ---
+            case "autoFocus": {
+                if (!(driver instanceof CanonAutoFocusSource)) {
+                    throw new UnsupportedOperationException(
+                            "The active driver cannot auto-focus on a point");
+                }
+                // Normalised 0..1 so the client never has to know the camera's EVF
+                // coordinate system, which is neither the JPEG's pixel size nor the
+                // same across bodies.
+                final double x = requireFraction(c, "x");
+                final double y = requireFraction(c, "y");
+                return CameraResult.ok(id, op, activeDriverId(),
+                        ((CanonAutoFocusSource) driver).focusAt(x, y));
+            }
+
             // --- live view ---
             case "liveViewStatus":
                 return CameraResult.ok(id, op, activeDriverId(), liveViewStatus());
@@ -287,6 +304,28 @@ public class CameraCommandService {
         return out;
     }
 
+    /** A 0..1 fraction argument, rejected loudly rather than silently clamped. */
+    private static double requireFraction(final CameraCommand c, final String name) {
+        final Object raw = c.getArgs().get(name);
+        if (raw == null) {
+            throw new IllegalArgumentException("'" + c.getOp() + "' requires argument '" + name + "'");
+        }
+        final double value;
+        if (raw instanceof Number) {
+            value = ((Number) raw).doubleValue();
+        } else {
+            try {
+                value = Double.parseDouble(String.valueOf(raw).trim());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("'" + name + "' must be a number between 0 and 1, got: " + raw);
+            }
+        }
+        if (value < 0 || value > 1 || Double.isNaN(value)) {
+            throw new IllegalArgumentException("'" + name + "' must be between 0 and 1, got: " + value);
+        }
+        return value;
+    }
+
     private Map<String, Object> liveViewStatus() {
         final Map<String, Object> data = new LinkedHashMap<>();
         // Must be false when nothing is active: `getActive() != JNI` is also true
@@ -296,6 +335,14 @@ public class CameraCommandService {
                 && active != CameraDriver.JNI
                 && driver instanceof CanonLiveViewSource;
         data.put("liveViewSupported", supported);
+        // Ask the *concrete* driver: the injected bean is a delegate that
+        // implements every capability interface unconditionally, so testing it
+        // would report every capability as available on every driver.
+        final CanonDriverWrapperInterface concrete =
+                driver instanceof DelegatingCanonDriverWrapper
+                        ? ((DelegatingCanonDriverWrapper) driver).activeDriverOrNull()
+                        : driver;
+        data.put("autoFocusSupported", supported && concrete instanceof CanonAutoFocusSource);
         // Live view is consumed over HTTP, not this protocol — a JSON channel
         // cannot carry 15fps of JPEG without wrecking the WebSocket.
         data.put("liveViewMjpeg", "/api/camera/liveview.mjpg");

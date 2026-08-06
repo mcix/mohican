@@ -14,7 +14,7 @@ import java.util.concurrent.ExecutionException;
  * driver actually supports live view — the JNI driver does not, and asking it
  * must fail loudly rather than silently return nothing.
  */
-public class DelegatingCanonDriverWrapper implements CanonDriverWrapperInterface, CanonLiveViewSource {
+public class DelegatingCanonDriverWrapper implements CanonDriverWrapperInterface, CanonLiveViewSource, CanonAutoFocusSource {
 
     private final CameraDriverRegistry registry;
 
@@ -269,6 +269,18 @@ public class DelegatingCanonDriverWrapper implements CanonDriverWrapperInterface
         } catch (UnsupportedOperationException | IllegalStateException e) {
             // Driver switched or went away while a stream was closing down.
         }
+    }
+
+    // --- auto focus -------------------------------------------------------
+
+    @Override
+    public java.util.Map<String, Object> focusAt(final double nx, final double ny) throws Exception {
+        final CanonDriverWrapperInterface driver = target();
+        if (!(driver instanceof CanonAutoFocusSource)) {
+            throw new UnsupportedOperationException(
+                    "Camera driver " + registry.getActive().getId() + " cannot auto-focus on a point");
+        }
+        return ((CanonAutoFocusSource) driver).focusAt(nx, ny);
     }
 
     @Override

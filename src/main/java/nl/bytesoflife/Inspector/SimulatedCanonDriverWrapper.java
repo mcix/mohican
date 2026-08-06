@@ -21,7 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface, CanonLiveViewSource {
+public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface, CanonLiveViewSource, CanonAutoFocusSource {
 
     private static final Logger logger = LoggerFactory.getLogger(SimulatedCanonDriverWrapper.class);
 
@@ -355,6 +355,30 @@ public class SimulatedCanonDriverWrapper implements CanonDriverWrapperInterface,
         if (liveViewConsumers.decrementAndGet() == 0) {
             logger.info("Simulated live view stopped");
         }
+    }
+
+    /**
+     * Pretend to focus.
+     * <p>
+     * Reports failure near the frame edges so the UI's red state is reachable
+     * without a camera — real bodies do struggle at the extremes, and a simulator
+     * that only ever succeeds leaves half the interface untested.
+     */
+    @Override
+    public java.util.Map<String, Object> focusAt(double nx, double ny) throws InterruptedException {
+        if (liveViewConsumers.get() <= 0) {
+            throw new IllegalStateException("Live view must be running to focus on a point");
+        }
+        Thread.sleep(400); // lens travel, roughly
+        boolean focused = nx >= 0.1 && nx <= 0.9 && ny >= 0.1 && ny <= 0.9;
+        logger.info("Simulated auto-focus at ({}, {}) -> {}", nx, ny, focused ? "OK" : "failed");
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("focused", focused);
+        result.put("code", 0);
+        result.put("reason", focused ? null : "SIMULATED_AF_NG");
+        result.put("x", nx);
+        result.put("y", ny);
+        return result;
     }
 
     @Override
