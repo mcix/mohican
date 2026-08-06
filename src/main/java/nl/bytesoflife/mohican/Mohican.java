@@ -395,7 +395,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 }
                 // --- v1 protocol (CANON_*, motors, …) ------------------------
                 case "POSITION_TIMEOUT": {
-                    Integer delayMs = (Integer) action.getValue();
+                    Integer delayMs = asInt(action.getValue(), "POSITION_TIMEOUT");
                     setPositionTimeOut(delayMs);
                     break;
                 }
@@ -420,7 +420,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     break;
                 }
                 case "BRAKE": {
-                    boolean status = (boolean) action.getValue();
+                    boolean status = asBool(action.getValue(), "BRAKE");
                     if (status) {
                         erosController.enableBrake();
 //                        erosController.message("X", "b1");
@@ -441,22 +441,22 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     break;
                 }
                 case "SET_ACCELERATION": {
-                    Integer value = Integer.valueOf((String) action.getValue());
+                    Integer value = asInt(action.getValue(), "SET_ACCELERATION");
                     erosController.setAccelerationInPercentage(value);
                     break;
                 }
                 case "SET_SPEED": {
-                    Integer value = Integer.valueOf((String) action.getValue());
+                    Integer value = asInt(action.getValue(), "SET_SPEED");
                     erosController.setSpeedInPercentage(value);
                     break;
                 }
                 case "SET_CURRENT": {
-                    Integer value = Integer.valueOf((String) action.getValue());
+                    Integer value = asInt(action.getValue(), "SET_CURRENT");
                     erosController.setCurrent(value);
                     break;
                 }
                 case "SET_MIN_MAX_POSITION": {
-                    String[] values = ((String) action.getValue()).split(" ");
+                    String[] values = String.valueOf(action.getValue()).split(" ");
                     Integer minX = Integer.valueOf(values[0]);
                     Integer maxX = Integer.valueOf(values[1]);
                     Integer minY = Integer.valueOf(values[2]);
@@ -490,7 +490,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                      */
 
                     if (action.getValue() != null) {
-                        Integer[] parsedString = Arrays.stream(((String) action.getValue()).split(" ", 3))
+                        Integer[] parsedString = Arrays.stream(String.valueOf(action.getValue()).split(" ", 3))
                                                        .map(Integer::parseInt)
                                                        .toArray(Integer[]::new);
                         Integer current = parsedString[0];
@@ -611,7 +611,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 }
 
                 case "CANON_SET_QUALITY": {
-                    canonDriverWrapper.setImageQuality((Integer) action.getValue());
+                    canonDriverWrapper.setImageQuality(asInt(action.getValue(), "CANON_SET_QUALITY"));
                     break;
                 }
                 case "CANON_GET_ALL_QUALITY": {
@@ -625,7 +625,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                 }
 
                 case "CANON_SET_APERTURE": {
-                    int err = canonDriverWrapper.setAperture((Integer) action.getValue());
+                    int err = canonDriverWrapper.setAperture(asInt(action.getValue(), "CANON_SET_APERTURE"));
                     break;
                 }
                 case "CANON_GET_ALL_APERTURE": {
@@ -639,7 +639,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     break;
                 }
                 case "CANON_SET_ISO": {
-                    int err = canonDriverWrapper.setIso((Integer) action.getValue());
+                    int err = canonDriverWrapper.setIso(asInt(action.getValue(), "CANON_SET_ISO"));
                     break;
                 }
                 case "CANON_GET_ALL_ISO": {
@@ -657,7 +657,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     break;
                 }
                 case "CANON_SET_SHUTTERSPEED": {
-                    canonDriverWrapper.setShutterSpeed((Integer) action.getValue());
+                    canonDriverWrapper.setShutterSpeed(asInt(action.getValue(), "CANON_SET_SHUTTERSPEED"));
                     break;
                 }
                 case "CANON_GET_IMAGE_INFO": {
@@ -845,6 +845,39 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     public void onCameraPictureTaken() {
         logger.info("onCameraPictureTaken");
         publishCameraEvent("pictureTaken");
+    }
+
+    /**
+     * Coerce a Redux action value to an int, whether it arrived as a JSON number
+     * or a JSON string.
+     * <p>
+     * The two transports disagree: {@code POST /mohicanreq} binds through Jackson
+     * and yields an Integer, while {@code ReduxAction.fromJson} (the STOMP path)
+     * casts everything to String. A handler that hard-casts either way therefore
+     * breaks on the other. SET_SPEED, SET_ACCELERATION and SET_CURRENT did exactly
+     * that — they cast to String, the frontend sent numbers, and the resulting
+     * ClassCastException was swallowed by the catch-all, so the motors silently ran
+     * on firmware defaults instead of the configured values.
+     */
+    private static int asInt(Object value, String what) {
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        if (value == null) {
+            throw new IllegalArgumentException(what + " requires a value");
+        }
+        return Integer.parseInt(String.valueOf(value).trim());
+    }
+
+    /** As {@link #asInt}, for booleans sent either as JSON true/false or "true"/"false". */
+    private static boolean asBool(Object value, String what) {
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value == null) {
+            throw new IllegalArgumentException(what + " requires a value");
+        }
+        return Boolean.parseBoolean(String.valueOf(value).trim());
     }
 
     /**

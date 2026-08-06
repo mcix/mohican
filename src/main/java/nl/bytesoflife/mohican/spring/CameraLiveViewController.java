@@ -53,8 +53,14 @@ public class CameraLiveViewController {
     /**
      * Live view needs a moment after EVF output flips to PC before the first frame
      * exists, so a null frame is normal at first. Give up only if they never stop.
+     * <p>
+     * Generous because a capture legitimately starves the stream: the driver drops
+     * EVF before the shutter, the shot itself can back off several seconds on a
+     * busy camera, and the restore afterwards retries while the camera writes the
+     * file. At the old ~10s the stream killed itself mid-capture and the operator
+     * had to reopen the feed after every photo.
      */
-    private static final int MAX_CONSECUTIVE_EMPTY_FRAMES = 150; // ~10s
+    private static final int MAX_CONSECUTIVE_EMPTY_FRAMES = 900; // ~60s
 
     private final CanonDriverWrapperInterface canonDriverWrapper;
 

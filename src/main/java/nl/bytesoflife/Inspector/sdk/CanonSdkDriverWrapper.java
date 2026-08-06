@@ -93,7 +93,11 @@ public class CanonSdkDriverWrapper implements CanonDriverWrapperInterface, Canon
                 .setSaveTo(EdsSaveTo.kEdsSaveTo_Camera)
                 .setShootWithNoAF(true)
                 .setShootAttemptCount(2)
-                .setCheckLiveViewState(true)
+                // We stop live view ourselves before shooting, so this would only
+                // add an extra EVF probe at the moment the camera is busiest —
+                // visible in the logs as "Live view seems off while testing status"
+                // and a plausible contributor to the DEVICE_BUSY we then retry past.
+                .setCheckLiveViewState(false)
                 .setWaitForItemDownloadEvent(false)
                 .setFetchEvents(false)
                 .build();
@@ -210,6 +214,62 @@ public class CanonSdkDriverWrapper implements CanonDriverWrapperInterface, Canon
         for (CanonDriverListener listener : listeners) {
             listener.onCameraPictureTaken();
         }
+    }
+
+    /**
+     * Bring live view back after a capture, off the caller's thread and retrying
+     * while the camera is busy.
+     * <p>
+     * The first attempt lands milliseconds after the shutter, when the camera is
+     * still writing the file, so it reliably gets EDS_ERR_DEVICE_BUSY. The original
+     * version tried once and logged the failure — which left liveViewRunning false
+     * while the browser's MJPEG connection was still open, so the stream fed on
+     * nulls until it hit its empty-frame limit and killed itself. One photo
+     * permanently ended live view for that session.
+     * <p>
+     * Asynchronous on purpose: the operator's photo must not wait on the feed
+     * coming back. takePhoto returns as soon as the image exists, and live view
+     * reappears a moment later.
+     */
+    private void restoreLiveViewAsync() {
+        RECONNECT.execute(() -> {
+            long delayMs = SHOOT_BUSY_RETRY_START_MS;
+            for (int attempt = 1; attempt <= SHOOT_BUSY_ATTEMPTS; attempt++) {
+                if (stopped || !sessionOpen || liveViewConsumers.get() <= 0) {
+                    return; // nobody left watching, or we are going down
+                }
+                try {
+                    synchronized (this) {
+                        if (liveViewRunning) {
+                            return;
+                        }
+                        submit(() -> {
+                            CanonFactory.liveViewLogic().beginLiveView(cameraRef,
+                                    EdsEvfOutputDevice.kEdsEvfOutputDevice_PC);
+                            return null;
+                        });
+                        liveViewRunning = true;
+                    }
+                    logger.info("Live view restored after the shot");
+                    return;
+                } catch (Exception e) {
+                    if (codeOf(e) != EdsdkError.EDS_ERR_DEVICE_BUSY.value()
+                            || attempt == SHOOT_BUSY_ATTEMPTS) {
+                        logger.warn("Could not restore live view after the shot", e);
+                        return;
+                    }
+                    logger.debug("Camera busy restoring live view {}/{}, retrying in {}ms",
+                            attempt, SHOOT_BUSY_ATTEMPTS, delayMs);
+                }
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                delayMs *= 2;
+            }
+        });
     }
 
     /**
@@ -540,20 +600,7 @@ public class CanonSdkDriverWrapper implements CanonDriverWrapperInterface, Canon
             // Put live view back for anyone still watching, so a capture does not
             // silently kill the feed the operator is aiming with.
             if (liveViewWasUp && liveViewWatchers > 0 && sessionOpen) {
-                try {
-                    synchronized (this) {
-                        if (!liveViewRunning) {
-                            submit(() -> {
-                                CanonFactory.liveViewLogic().beginLiveView(cameraRef,
-                                        EdsEvfOutputDevice.kEdsEvfOutputDevice_PC);
-                                return null;
-                            });
-                            liveViewRunning = true;
-                        }
-                    }
-                } catch (Exception e) {
-                    logger.warn("Could not restore live view after the shot", e);
-                }
+                restoreLiveViewAsync();
             }
         }
     }
