@@ -36,6 +36,7 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 
@@ -55,7 +56,24 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     private MohicanFrame mohicanFrame;
     private String positionX;
     private String positionY;
-    private ErosController erosController;
+    private volatile ErosController erosController;
+    private EncoderListener encoderListenerX;
+    private EncoderListener encoderListenerY;
+
+    /** Guards connectMotors(): startup, the Reconnect button and the retry must not interleave. */
+    private final Object motorLock = new Object();
+    /** "teknic", "serial" or "none" — what drives the head right now. */
+    private volatile String motorDriver = "none";
+    /** What the motor panel shows; also sent with GET_VERSION and pushed on change. */
+    private volatile String motorStatus = "looking for the machine\u2026";
+    private volatile boolean motorReady = false;
+    private final ScheduledExecutorService motorConnect = Executors.newSingleThreadScheduledExecutor(r -> {
+        final Thread t = new Thread(r, "motor-connect");
+        t.setDaemon(true);
+        return t;
+    });
+    private ScheduledFuture<?> motorRetryTask;
+    private int motorRetryDelay = 0;
     private boolean sessionOpen = false;
     private int canonError;
     
@@ -119,6 +137,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     @javax.annotation.PreDestroy
     public void shutdownDispatcher() {
         messageDispatcher.shutdown();
+        motorConnect.shutdownNow();
     }
 
     /**
@@ -219,7 +238,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         toMMx = Configuration.getInstance().getposToMMx();
         toMMy = Configuration.getInstance().getposToMMy();
 
-        EncoderListener encoderListenerX = new EncoderListener() {
+        encoderListenerX = new EncoderListener() {
 
             public void newPos(int value) {
                 posX = (value);
@@ -273,7 +292,7 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
             }
         };
 
-        EncoderListener encoderListenerY = new EncoderListener() {
+        encoderListenerY = new EncoderListener() {
             public void newPos(final int value) {
                 posY = (value);
                 String val = df.format(toMMy.multiply(new BigDecimal(posY)));
@@ -327,22 +346,245 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         //     logger.info("canonDriverWrapper init success");
         // }
 
-        if (Configuration.getInstance().getTeknicPort() != null) {
+        erosController = new NoMachineController("starting");
+        endLegacyMohican();
+        connectMotors();
+    }
 
-
-            toMMx = Configuration.getInstance().getposToMMx();
-            toMMy = Configuration.getInstance().getposToMMy();
-
-            erosController = new DeltaProtoDriver(Configuration.getInstance().getTeknicPort(), encoderListenerX, encoderListenerY);
-
-            erosController.reInitialize();
-        } else {
-
-            erosController = new ErosControllerImpl(encoderListenerX, encoderListenerY);
-            erosController.reInitialize();
-
+    /**
+     * The legacy Mohican holds the machine's port and crashes when it finds it
+     * busy, so an operator who switches to the web page with the old window
+     * still open gets nothing. End it first (Windows; see LegacyProcessKiller).
+     */
+    private void endLegacyMohican() {
+        final Configuration cfg = Configuration.getInstance();
+        if (!cfg.getLegacyKill()) {
+            return;
         }
+        try {
+            final String done = LegacyProcessKiller.killLegacy(cfg.getLegacyKillMatch());
+            if (done != null) {
+                logger.warn(done);
+                setMotorStatus(motorDriver, done, false);
+            }
+        } catch (Throwable t) {
+            logger.warn("Looking for a legacy Mohican failed", t);
+        }
+    }
 
+    /**
+     * Release the machine on the way down: sFoundation closes the hub port and
+     * the serial ports are closed, so the next program (this client again, or
+     * the legacy one) can open them straight away instead of waiting for the
+     * process to be gone. Bounded: a driver that hangs in its close must not
+     * keep the process alive, that would hold the port for good.
+     */
+    @javax.annotation.PreDestroy
+    public void closeMotorPorts() {
+        final ErosController current;
+        synchronized (motorLock) {
+            cancelMotorRetry();
+            current = erosController;
+            erosController = new NoMachineController("shutting down");
+        }
+        if (current == null || current instanceof NoMachineController) {
+            return;
+        }
+        final Thread closer = new Thread(() -> {
+            try {
+                current.closePorts();
+                logger.info("Motor ports closed");
+            } catch (Throwable t) {
+                logger.warn("Closing the motor ports failed", t);
+            }
+        }, "motor-close");
+        closer.setDaemon(true);
+        closer.start();
+        try {
+            closer.join(5000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        if (closer.isAlive()) {
+            logger.warn("Closing the motor ports did not finish in 5 s; exiting anyway");
+        }
+    }
+
+    /**
+     * QUIT from the web page: leave, releasing the machine and the camera, so
+     * the operator can hand the computer to the legacy application (or restart
+     * this client) without hunting for the process. A headless instance has no
+     * other way out. The reply goes first, then the exit runs off this thread
+     * so the command worker returns normally.
+     */
+    private void quit() {
+        logger.warn("QUIT received, exiting");
+        final Thread exit = new Thread(() -> {
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            System.exit(0);
+        }, "quit");
+        exit.setDaemon(true);
+        exit.start();
+    }
+
+    /**
+     * Find the machine and bring up its driver.
+     * <p>
+     * The legacy rule was "Teknic if {@code teknic.port} is set, serial otherwise",
+     * and a Teknic failure (no DLL, no hub) left the motors dead until a restart.
+     * Now, with {@code motor.driver=auto} (the default), the Teknic hub is looked
+     * for among the serial ports first; found, the Teknic driver is used, else the
+     * serial microPlacer driver. Whatever fails falls through to the next option,
+     * and when nothing answers the search runs again after a growing delay, so a
+     * machine switched on after Mohican is picked up without a Reconnect. The same
+     * shape as the camera driver registry: lazy, guarded, retried, and reported in
+     * the window and to the web client.
+     */
+    private void connectMotors() {
+        synchronized (motorLock) {
+            cancelMotorRetry();
+            final Configuration cfg = Configuration.getInstance();
+            final String mode = cfg.getMotorDriver();
+
+            final ErosController previous = erosController;
+            if (previous != null && !(previous instanceof NoMachineController)) {
+                try {
+                    previous.closePorts();
+                } catch (Throwable t) {
+                    logger.warn("Closing the previous motor driver failed", t);
+                }
+            }
+            motorReady = false;
+
+            TeknicHubFinder.HubPort hub = null;
+            if (!"serial".equals(mode)) {
+                hub = TeknicHubFinder.find(cfg.getTeknicHubMatch());
+            }
+
+            if ("teknic".equals(mode) || hub != null) {
+                final String port = cfg.getTeknicPort() != null ? cfg.getTeknicPort()
+                        : (hub != null && hub.comNumber >= 0 ? String.valueOf(hub.comNumber) : "0");
+                final String where = hub != null ? hub.toString() : "COM" + port;
+                setMotorStatus("teknic", "Teknic hub " + where + ": connecting\u2026", false);
+                try {
+                    final DeltaProtoDriver teknic = new DeltaProtoDriver(port, encoderListenerX, encoderListenerY);
+                    teknic.setOnLost(() -> {
+                        setMotorStatus("teknic", "Teknic hub " + where + ": lost, looking again\u2026", false);
+                        scheduleMotorRetry();
+                    });
+                    teknic.reInitialize();
+                    erosController = teknic;
+                    motorRetryDelay = 0;
+                    setMotorStatus("teknic", "Teknic hub " + where + " \u25cf ready", true);
+                    return;
+                } catch (Throwable t) {
+                    logger.error("Teknic driver failed on {}", where, t);
+                    final String why = "Teknic hub " + where + ": " + rootMessage(t);
+                    if ("teknic".equals(mode)) {
+                        erosController = new NoMachineController(why);
+                        setMotorStatus("none", why, false);
+                        scheduleMotorRetry();
+                        return;
+                    }
+                    // auto: a hub is there but cannot be driven (no DLL on this
+                    // machine, ClearView holding the port). Try the serial motors.
+                    logger.warn("Falling back to the serial microPlacer driver");
+                }
+            }
+
+            final ErosControllerImpl serial = new ErosControllerImpl(encoderListenerX, encoderListenerY);
+            if (hub != null) {
+                serial.setExcludedPorts(Collections.singleton(hub.systemName));
+            }
+            try {
+                serial.reInitialize();
+            } catch (Throwable t) {
+                logger.error("Serial motor driver failed", t);
+                final String why = "microPlacer: " + rootMessage(t);
+                erosController = new NoMachineController(why);
+                setMotorStatus("none", why, false);
+                scheduleMotorRetry();
+                return;
+            }
+            erosController = serial;
+            final String probing = serial.getProbedPorts();
+            setMotorStatus("serial", probing.isEmpty() ? "no serial ports found" : "microPlacer: probing " + probing + "\u2026", false);
+            // The boards identify themselves asynchronously; look again shortly.
+            motorRetryTask = motorConnect.schedule(() -> settleSerial(serial), 4, TimeUnit.SECONDS);
+        }
+    }
+
+    /** Four seconds after a serial probe: did both axes answer? */
+    private void settleSerial(ErosControllerImpl serial) {
+        synchronized (motorLock) {
+            if (erosController != serial) {
+                return;
+            }
+            if (serial.isReady()) {
+                motorRetryDelay = 0;
+                setMotorStatus("serial", "microPlacer on " + serial.getProbedPorts() + " \u25cf ready", true);
+                return;
+            }
+            final String probed = serial.getProbedPorts();
+            setMotorStatus("serial", probed.isEmpty() ? "no serial ports found" : "no machine on " + probed, false);
+            scheduleMotorRetry();
+        }
+    }
+
+    /** Look again after 5, 10, 20, 40, then every 60 seconds. */
+    private void scheduleMotorRetry() {
+        synchronized (motorLock) {
+            cancelMotorRetry();
+            final int base = Math.max(1, Configuration.getInstance().getMotorRetrySeconds());
+            motorRetryDelay = motorRetryDelay == 0 ? base : Math.min(60, motorRetryDelay * 2);
+            logger.info("Looking for the machine again in {} s", motorRetryDelay);
+            try {
+                motorRetryTask = motorConnect.schedule(this::connectMotors, motorRetryDelay, TimeUnit.SECONDS);
+            } catch (java.util.concurrent.RejectedExecutionException e) {
+                // Shutting down.
+            }
+        }
+    }
+
+    private void cancelMotorRetry() {
+        if (motorRetryTask != null) {
+            motorRetryTask.cancel(false);
+            motorRetryTask = null;
+        }
+    }
+
+    private static String rootMessage(Throwable t) {
+        Throwable cause = t;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        final String message = cause.getMessage();
+        return message == null || message.isEmpty() ? cause.getClass().getSimpleName() : message;
+    }
+
+    private void setMotorStatus(String driver, String status, boolean ready) {
+        motorDriver = driver;
+        motorStatus = status;
+        motorReady = ready;
+        logger.info("Motors: {}", status);
+        withUi(ui -> ui.setMotorStatus(status, ready));
+        sendMessage("MOHICAN_MOTOR_STATUS", MotorStatus.builder().driver(driver).status(status).ready(ready).build());
+    }
+
+    public String getMotorStatus() {
+        return motorStatus;
+    }
+
+    public String getMotorDriver() {
+        return motorDriver;
+    }
+
+    public boolean isMotorReady() {
+        return motorReady;
     }
 
     private BigDecimal getNumber(Object value) {
@@ -518,9 +760,22 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     // the camera session.
                     break;
                 }
+                case "QUIT": {
+                    sendMessage("MOHICAN_QUIT", "bye");
+                    quit();
+                    break;
+                }
+
                 case "GET_VERSION": {
                     String javaVersion = System.getProperty("java.version");
-                    sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).versions(erosController.getVersion()).build());
+                    Map<String, String> versions = new HashMap<>(erosController.getVersion());
+                    versions.put("driver", motorDriver);
+                    versions.put("motorStatus", motorStatus);
+                    versions.put("motorReady", String.valueOf(motorReady));
+                    sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).versions(versions).build());
+                    // The web client asks for the version right after connecting;
+                    // give it the motor state at the same moment.
+                    sendMessage("MOHICAN_MOTOR_STATUS", MotorStatus.builder().driver(motorDriver).status(motorStatus).ready(motorReady).build());
                     break;
                 }
 
@@ -911,8 +1166,12 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         }
     }
 
+    /** The Reconnect button: look for the machine again, off the Swing thread. */
     void reInitialize() {
-        erosController.reInitialize();
+        synchronized (motorLock) {
+            motorRetryDelay = 0;
+        }
+        motorConnect.execute(this::connectMotors);
     }
 
     private void setPositionTimeOut(Integer ms) {
@@ -981,6 +1240,14 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     @Override
     public void run() {
         sendPosition();
+    }
+
+    @Data
+    @Builder
+    public static class MotorStatus {
+        String driver;
+        String status;
+        boolean ready;
     }
 
     @Data

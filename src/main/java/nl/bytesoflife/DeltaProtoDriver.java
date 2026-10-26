@@ -7,18 +7,68 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.Thread.sleep;
 
+/**
+ * The hybrid placer's motors: two Teknic ClearPath-SC nodes behind an SC hub,
+ * driven through {@code deltateknic.dll} (JNI over sFoundation).
+ * <p>
+ * The native library is loaded on first use, not when the class loads. A static
+ * initialiser that threw would poison the class for the rest of the JVM
+ * (NoClassDefFoundError on every later touch), so a missing DLL — every Mac, and
+ * a Windows box without the Teknic runtime — would have taken the whole motor
+ * subsystem down instead of letting Mohican fall back to the serial driver.
+ * <p>
+ * The native {@code openPort} finds the hub by itself (sFoundation's
+ * {@code FindComHubPorts}) and opens every hub it sees; the port number it is
+ * given is only echoed in its log. It returns a handle whether or not a hub was
+ * found, so a failed open only shows up as the first command throwing. That is
+ * why {@link nl.bytesoflife.mohican.Mohican} looks for the hub on the Java side
+ * first ({@link TeknicHubFinder}) and why every native call here is guarded.
+ */
 public class DeltaProtoDriver implements ErosController, Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(DeltaProtoDriver.class);
 
-    static {
-        logger.info(System.getProperty("java.library.path"));
-        logger.info("*** load library ***");
-        System.loadLibrary("deltateknic");
+    /** Native library name, {@code deltateknic.dll} next to the jar on Windows. */
+    public static final String NATIVE_LIBRARY = "deltateknic";
+
+    /** Position polls that may fail in a row before the hub is considered lost. */
+    private static final int MAX_POLL_FAILURES = 20;
+
+    private static Boolean nativeLoaded = null;
+    private static Throwable nativeFailure = null;
+
+    /**
+     * Load the JNI library once; later calls return the cached outcome.
+     *
+     * @return true when the library is available on this machine
+     */
+    public static synchronized boolean loadNativeLibrary() {
+        if (nativeLoaded != null) {
+            return nativeLoaded;
+        }
+        logger.info("java.library.path = {}", System.getProperty("java.library.path"));
+        logger.info("*** load library {} ***", NATIVE_LIBRARY);
+        try {
+            System.loadLibrary(NATIVE_LIBRARY);
+            nativeLoaded = true;
+        } catch (Throwable t) {
+            // UnsatisfiedLinkError when the DLL (or sFoundation20.dll it needs) is
+            // not there, or on a platform that has no build of it at all.
+            nativeFailure = t;
+            nativeLoaded = false;
+            logger.warn("Teknic native library not available: {}", t.toString());
+        }
+        return nativeLoaded;
+    }
+
+    /** Why {@link #loadNativeLibrary()} failed, or null. */
+    public static Throwable nativeFailure() {
+        return nativeFailure;
     }
 
     //6400 pulses per rotation
@@ -58,6 +108,17 @@ public class DeltaProtoDriver implements ErosController, Runnable {
     private int speed= 50;
     private int acceleration= 50;
 
+    private volatile boolean ready = false;
+    private volatile int pollFailures = 0;
+    private volatile Runnable onLost = null;
+
+    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
+        final Thread t = new Thread(r, "teknic-position");
+        t.setDaemon(true);
+        return t;
+    });
+    private ScheduledFuture<?> poll = null;
+
     private int getAccByPercentage( int perc ) {
         Double x= ((double)(maxAcc - minAcc) / 100);
         x= x * perc;
@@ -70,33 +131,106 @@ public class DeltaProtoDriver implements ErosController, Runnable {
         return x.intValue() + minVel;
     }
 
+    /**
+     * @param port the COM number of the hub ("11" for COM11). Only echoed by the
+     *             native driver, which finds the hub itself; kept so the log and
+     *             the status show which port was meant.
+     */
     public DeltaProtoDriver(String port, EncoderListener encoderListenerX, EncoderListener encoderListenerY ) {
         this.port= port;
         this.encoderListenerX= encoderListenerX;
         this.encoderListenerY= encoderListenerY;
     }
 
-    public void reInitialize() {
-        int portNum= Integer.valueOf( port );
-        logger.info("TeknicController.reInitialize " + portNum);
-        p= openPort( portNum );
+    public String getPort() {
+        return port;
+    }
 
-        home(p);
-        maxAcc= getMaxAcc(p);
-        maxVel= getMaxVel(p);
-        minAcc= getMinAcc(p);
-        minVel= getMinVel(p);
+    /** True once the hub opened and the nodes homed; false again when polling it keeps failing. */
+    public boolean isReady() {
+        return ready;
+    }
+
+    /** Called (once) from the poll thread when the hub stops answering. */
+    public void setOnLost(Runnable onLost) {
+        this.onLost = onLost;
+    }
+
+    /**
+     * Open the hub, home both axes and start polling the position.
+     *
+     * @throws IllegalStateException when the native library is missing or the hub
+     *                               does not open; the driver is unusable then and
+     *                               the caller should fall back to another one
+     */
+    public synchronized void reInitialize() {
+        stopPolling();
+        ready = false;
+        pollFailures = 0;
+
+        if (!loadNativeLibrary()) {
+            throw new IllegalStateException("Teknic native library (" + NATIVE_LIBRARY + ") is not available: "
+                    + (nativeFailure == null ? "unknown" : nativeFailure.getMessage()));
+        }
+
+        int portNum = 0;
+        try {
+            portNum = Integer.parseInt(String.valueOf(port).trim());
+        } catch (NumberFormatException e) {
+            logger.warn("teknic.port '{}' is not a number, passing 0 to the driver (it finds the hub itself)", port);
+        }
+        logger.info("TeknicController.reInitialize " + portNum);
+
+        try {
+            p= openPort( portNum );
+            if (p == 0) {
+                throw new IllegalStateException("Teknic hub did not open (null handle)");
+            }
+            home(p);
+            maxAcc= getMaxAcc(p);
+            maxVel= getMaxVel(p);
+            minAcc= getMinAcc(p);
+            minVel= getMinVel(p);
+        } catch (IllegalStateException e) {
+            closeQuietly();
+            throw e;
+        } catch (Throwable t) {
+            // A C++ exception that the JNI layer turned into a Java one, or a
+            // link error for a symbol the DLL on this machine does not have.
+            closeQuietly();
+            throw new IllegalStateException("Teknic hub failed to initialise: " + t, t);
+        }
+        logger.info("Teknic hub open: acc {}..{} vel {}..{}", minAcc, maxAcc, minVel, maxVel);
 
         encoderListenerX.newPos( 0 );
         encoderListenerY.newPos( 0 );
 
-        ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-
-        executor.scheduleWithFixedDelay(this, 0, 50, TimeUnit.MILLISECONDS);
+        ready = true;
+        poll = executor.scheduleWithFixedDelay(this, 0, 50, TimeUnit.MILLISECONDS);
     }
 
-    public void closePorts() {
-        closePort( p );
+    private void stopPolling() {
+        if (poll != null) {
+            poll.cancel(false);
+            poll = null;
+        }
+    }
+
+    private void closeQuietly() {
+        if (p != 0) {
+            try {
+                closePort(p);
+            } catch (Throwable t) {
+                logger.warn("closePort failed", t);
+            }
+            p = 0;
+        }
+    }
+
+    public synchronized void closePorts() {
+        stopPolling();
+        ready = false;
+        closeQuietly();
     }
 
     private void setPcbPosition(int x, int y) {
@@ -261,7 +395,10 @@ public class DeltaProtoDriver implements ErosController, Runnable {
 
     @Override
     public Map<String, String> getVersion() {
-        return new HashMap<>();
+        final Map<String, String> version = new HashMap<>();
+        version.put("driver", "teknic");
+        version.put("port", "COM" + port);
+        return version;
     }
 
     public void setAccelerationInPercentage( Integer value ) {
@@ -273,12 +410,38 @@ public class DeltaProtoDriver implements ErosController, Runnable {
         }
     }
 
+    /**
+     * The position poll. A throwing native call must not kill the scheduler
+     * silently (a ScheduledExecutorService stops a task after its first
+     * exception); it is counted, and after enough failures in a row the hub is
+     * reported lost so Mohican can look for it again.
+     */
     @Override
     public void run() {
-        Integer x = getPosX();
-        Integer y = getPosY();
+        if (!ready) {
+            return;
+        }
+        try {
+            Integer x = getPosX();
+            Integer y = getPosY();
 
-        encoderListenerX.newPos( x );
-        encoderListenerY.newPos( y );
+            encoderListenerX.newPos( x );
+            encoderListenerY.newPos( y );
+            pollFailures = 0;
+        } catch (Throwable t) {
+            pollFailures++;
+            if (pollFailures == 1) {
+                logger.warn("Teknic position poll failed: {}", t.toString());
+            }
+            if (pollFailures >= MAX_POLL_FAILURES) {
+                logger.error("Teknic hub stopped answering ({} polls failed), giving it up", pollFailures);
+                ready = false;
+                stopPolling();
+                final Runnable lost = onLost;
+                if (lost != null) {
+                    lost.run();
+                }
+            }
+        }
     }
 }

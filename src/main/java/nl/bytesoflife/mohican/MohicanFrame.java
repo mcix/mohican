@@ -31,6 +31,7 @@ public class MohicanFrame extends JFrame {
 
     private JComboBox<CameraDriver> driverSelector;
     private JLabel driverStatusLabel;
+    private JLabel motorStatusLabel;
     /** Guards the selector's listener while we set it programmatically. */
     private volatile boolean suppressDriverEvents = false;
 
@@ -99,7 +100,7 @@ public class MohicanFrame extends JFrame {
         frame.add(reconnectButton);
         frame.setPreferredSize(new Dimension(200, 45));
 
-        createLayout(titleLabel, frame2, frame, buildCameraPanel());
+        createLayout(titleLabel, frame2, frame, buildMotorPanel(), buildCameraPanel());
 
         if (Configuration.getInstance().getMotoroSimulate()) {
             DecimalFormat df = new DecimalFormat();
@@ -126,7 +127,7 @@ public class MohicanFrame extends JFrame {
         }
 
         setTitle("Mohican");
-        setSize(250, 210);
+        setSize(250, 270);
         setLocationRelativeTo(null);
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -199,6 +200,32 @@ public class MohicanFrame extends JFrame {
         panel.add(driverStatusLabel, BorderLayout.SOUTH);
         panel.setPreferredSize(new Dimension(200, 70));
         return panel;
+    }
+
+    /**
+     * Which machine drives the head, and whether it answers. Mohican finds the
+     * machine by itself (Teknic hub, else the serial microPlacer) and keeps
+     * looking while nothing is there; Reconnect starts that search over.
+     */
+    private JPanel buildMotorPanel() {
+        JPanel panel = new JPanel(new BorderLayout(4, 2));
+        panel.setBorder(BorderFactory.createTitledBorder("Motors"));
+        motorStatusLabel = new JLabel("looking for the machine\u2026", SwingConstants.CENTER);
+        motorStatusLabel.setFont(motorStatusLabel.getFont().deriveFont(Font.PLAIN, 11f));
+        panel.add(motorStatusLabel, BorderLayout.CENTER);
+        panel.setPreferredSize(new Dimension(200, 45));
+        return panel;
+    }
+
+    public void setMotorStatus(String status, boolean ready) {
+        SwingUtilities.invokeLater(() -> {
+            if (motorStatusLabel == null) {
+                return;
+            }
+            motorStatusLabel.setText(status);
+            motorStatusLabel.setToolTipText(status);
+            motorStatusLabel.setForeground(ready ? new Color(0x2e, 0x7d, 0x32) : UIManager.getColor("Label.foreground"));
+        });
     }
 
     /** Reflect the active driver without re-triggering the switch listener. */

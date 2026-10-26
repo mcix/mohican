@@ -30,6 +30,11 @@ public class ErosControllerImpl implements ErosController {
 
     final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
+    /** Ports not to probe: the Teknic hub, when one is present but could not be driven. */
+    private final Set<String> excludedPorts = new HashSet<>();
+    /** The ports the last reInitialize() probed, for the status label. */
+    private volatile List<String> probedPorts = Collections.emptyList();
+
     public ErosControllerImpl(  )
     {
     }
@@ -40,11 +45,41 @@ public class ErosControllerImpl implements ErosController {
         this.encoderListenerY= encoderListenerY;
     }
 
+    public void setExcludedPorts(Collection<String> ports) {
+        excludedPorts.clear();
+        for (String port : ports) {
+            if (port != null) {
+                excludedPorts.add(port.toLowerCase());
+            }
+        }
+    }
+
+    /** True once both axes have answered on a port. */
+    public boolean isReady() {
+        return motorX != null && motorY != null;
+    }
+
+    /** The serial ports the last probe opened, "COM3, COM4"; empty when there were none. */
+    public String getProbedPorts() {
+        return String.join(", ", probedPorts);
+    }
+
     public void reInitialize()
     {
         for (MotorController c : connectedDevices) {
-            c.terminate();
+            try {
+                c.terminate();
+            } catch (Exception e) {
+                // A port that is already gone must not stop the re-probe.
+            }
         }
+        // Terminated controllers were kept and terminated again on every
+        // Reconnect; and an axis found by an earlier probe must not count as
+        // present until it answers again.
+        connectedDevices.clear();
+        motorX = null;
+        motorY = null;
+        mainPcb = null;
 
         List<String> portNames;
         if( SerialNativeInterface.getOsType() != 1 ) { //unix
@@ -56,7 +91,11 @@ public class ErosControllerImpl implements ErosController {
             portNames = Arrays.stream(SerialPortList.getPortNames()).distinct().collect(Collectors.toList());
         }
 
-        portNames = portNames.stream().filter(s -> !s.toLowerCase().contains("bluetooth")).collect(Collectors.toList());
+        portNames = portNames.stream()
+                .filter(s -> !s.toLowerCase().contains("bluetooth"))
+                .filter(s -> !excludedPorts.contains(s.toLowerCase()))
+                .collect(Collectors.toList());
+        probedPorts = new ArrayList<>(portNames);
 
         ArrayList<Object> ports = new ArrayList<>();
         for (String port : portNames) {
@@ -335,9 +374,18 @@ public class ErosControllerImpl implements ErosController {
     @Override
     public Map<String, String> getVersion() {
         Map<String, String> version = new HashMap<>();
-        version.put("X", motorX.getVersion());
-        version.put("Y", motorY.getVersion());
-        version.put("MAIN", mainPcb.getVersion());
+        version.put("driver", "serial");
+        // Used to dereference all three unguarded, so GET_VERSION threw (and was
+        // swallowed) whenever a board had not answered yet.
+        if (motorX != null) {
+            version.put("X", motorX.getVersion());
+        }
+        if (motorY != null) {
+            version.put("Y", motorY.getVersion());
+        }
+        if (mainPcb != null) {
+            version.put("MAIN", mainPcb.getVersion());
+        }
         return version;
     }
 }

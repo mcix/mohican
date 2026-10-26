@@ -254,8 +254,55 @@ public class Configuration
         return Integer.valueOf( props.getProperty( "vacuum.bottom", "2000" ) );
     }
 
+    /**
+     * Origins the browser may drive this client from (CORS and the websocket).
+     * <p>
+     * Patterns, not plain origins: {@code https://*.deltaproto.com} covers the
+     * operator page on mohican.deltaproto.com and the blue/green hosts, and
+     * {@code localhost:[*]} any dev port. Override with {@code allowed.origins},
+     * {@code |}-separated.
+     */
     public String[] getAllowedOrigins() {
-        return props.getProperty("allowed.origins", "http://localhost:3000|https://deltaproto.com|https://www.deltaproto.com").split("\\|");
+        return props.getProperty("allowed.origins",
+                "http://localhost:[*]|https://localhost:[*]|https://deltaproto.com|https://www.deltaproto.com|https://*.deltaproto.com")
+                .split("\\|");
+    }
+
+    /**
+     * Which motor driver to run: {@code auto} (default), {@code teknic} or
+     * {@code serial}.
+     * <p>
+     * {@code auto} looks for a Teknic ClearPath-SC hub among the serial ports
+     * and uses the Teknic driver when one is there, the serial microPlacer
+     * driver otherwise. A configured {@code teknic.port} still forces the Teknic
+     * driver, so existing hybrid-placer configs keep working unchanged.
+     */
+    public String getMotorDriver() {
+        final String configured = props.getProperty("motor.driver");
+        if (configured != null && !configured.trim().isEmpty()) {
+            return configured.trim().toLowerCase();
+        }
+        return getTeknicPort() != null ? "teknic" : "auto";
+    }
+
+    /** Regular expression that recognises the Teknic hub by its serial port name. */
+    public String getTeknicHubMatch() {
+        return props.getProperty("teknic.hub.match", TeknicHubFinder.DEFAULT_MATCH);
+    }
+
+    /** How long to wait before looking for the machine again when none was found. */
+    public int getMotorRetrySeconds() {
+        return Integer.valueOf(props.getProperty("motor.retry.seconds", "5"));
+    }
+
+    /** End a running legacy Mohican at startup, so this client can open the machine (Windows). */
+    public boolean getLegacyKill() {
+        return Boolean.parseBoolean(props.getProperty("legacy.kill", "true"));
+    }
+
+    /** Which java command lines count as the legacy Mohican. */
+    public String getLegacyKillMatch() {
+        return props.getProperty("legacy.kill.match", nl.bytesoflife.mohican.LegacyProcessKiller.DEFAULT_MATCH);
     }
 
     public boolean getCameraSimulate() {
