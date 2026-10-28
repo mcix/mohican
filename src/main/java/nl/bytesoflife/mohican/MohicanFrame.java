@@ -32,6 +32,7 @@ public class MohicanFrame extends JFrame {
     private JComboBox<CameraDriver> driverSelector;
     private JLabel driverStatusLabel;
     private JLabel motorStatusLabel;
+    private JLabel vacuumStatusLabel;
     /** Guards the selector's listener while we set it programmatically. */
     private volatile boolean suppressDriverEvents = false;
 
@@ -213,8 +214,23 @@ public class MohicanFrame extends JFrame {
         motorStatusLabel = new JLabel("looking for the machine\u2026", SwingConstants.CENTER);
         motorStatusLabel.setFont(motorStatusLabel.getFont().deriveFont(Font.PLAIN, 11f));
         panel.add(motorStatusLabel, BorderLayout.CENTER);
-        panel.setPreferredSize(new Dimension(200, 45));
+        // Only filled in on the machines where Mohican runs the vacuum pump itself.
+        vacuumStatusLabel = new JLabel(" ", SwingConstants.CENTER);
+        vacuumStatusLabel.setFont(vacuumStatusLabel.getFont().deriveFont(Font.PLAIN, 11f));
+        panel.add(vacuumStatusLabel, BorderLayout.SOUTH);
+        panel.setPreferredSize(new Dimension(200, 60));
         return panel;
+    }
+
+    public void setVacuumStatus(String status, boolean ok) {
+        SwingUtilities.invokeLater(() -> {
+            if (vacuumStatusLabel == null) {
+                return;
+            }
+            vacuumStatusLabel.setText(status);
+            vacuumStatusLabel.setToolTipText(status);
+            vacuumStatusLabel.setForeground(ok ? new Color(0x2e, 0x7d, 0x32) : new Color(0xc6, 0x28, 0x28));
+        });
     }
 
     public void setMotorStatus(String status, boolean ready) {

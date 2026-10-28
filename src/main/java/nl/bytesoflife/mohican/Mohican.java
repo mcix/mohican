@@ -74,6 +74,8 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
     });
     private ScheduledFuture<?> motorRetryTask;
     private int motorRetryDelay = 0;
+    /** Runs the pump on the machines without an integrated vacuum controller; null elsewhere. */
+    private VacuumPumpController vacuumPump;
     private boolean sessionOpen = false;
     private int canonError;
     
@@ -349,6 +351,49 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         erosController = new NoMachineController("starting");
         endLegacyMohican();
         connectMotors();
+        startVacuumControl();
+    }
+
+    /**
+     * The legacy Mohican ran the vacuum pump itself on the machines whose
+     * controller does not: {@code vacuum.port} set means such a machine. The
+     * loop lives in this process, not on the web page, which only gets told
+     * what it is doing (and shows it next to the motor status).
+     */
+    private void startVacuumControl() {
+        final Configuration cfg = Configuration.getInstance();
+        final String port = cfg.getVacuumPort();
+        if (port == null || port.trim().isEmpty() || vacuumPump != null) {
+            return;
+        }
+        final java.util.List<String> reserved = new ArrayList<>();
+        reserved.add(cfg.getPortX());
+        reserved.add(cfg.getPortY());
+        reserved.add(cfg.getPortXenc());
+        reserved.add(cfg.getPortYenc());
+        final TeknicHubFinder.HubPort hub = TeknicHubFinder.find(cfg.getTeknicHubMatch());
+        if (hub != null) {
+            reserved.add(hub.systemName);
+        }
+        vacuumPump = new VacuumPumpController(port.trim(), cfg.getVacuumRelayPort(), cfg.getVacuumRelayMatch(), reserved,
+                cfg.getVacuumTop(), cfg.getVacuumBottom(), cfg.getVacuumIntervalMs(), cfg.getVacuumMissedMax(),
+                this::onVacuum);
+        vacuumPump.start();
+    }
+
+    private void onVacuum(VacuumPumpController.State state) {
+        withUi(ui -> ui.setVacuumStatus(state.status, state.ok));
+        sendMessage("MOHICAN_VACUUM", VacuumStatus.of(state));
+    }
+
+    /** Pump off and its ports released before the process goes. */
+    @javax.annotation.PreDestroy
+    public void closeVacuumControl() {
+        final VacuumPumpController pump = vacuumPump;
+        vacuumPump = null;
+        if (pump != null) {
+            pump.close();
+        }
     }
 
     /**
@@ -776,6 +821,9 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     // The web client asks for the version right after connecting;
                     // give it the motor state at the same moment.
                     sendMessage("MOHICAN_MOTOR_STATUS", MotorStatus.builder().driver(motorDriver).status(motorStatus).ready(motorReady).build());
+                    if (vacuumPump != null) {
+                        sendMessage("MOHICAN_VACUUM", VacuumStatus.of(vacuumPump.getState()));
+                    }
                     break;
                 }
 
@@ -1248,6 +1296,20 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         String driver;
         String status;
         boolean ready;
+    }
+
+    /** What the pump loop is doing, for the web page's status line (display only). */
+    @Data
+    @Builder
+    public static class VacuumStatus {
+        Integer value;
+        Boolean pumpOn;
+        boolean ok;
+        String status;
+
+        static VacuumStatus of(VacuumPumpController.State s) {
+            return VacuumStatus.builder().value(s.value).pumpOn(s.pumpOn).ok(s.ok).status(s.status).build();
+        }
     }
 
     @Data

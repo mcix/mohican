@@ -254,6 +254,26 @@ public class Configuration
         return Integer.valueOf( props.getProperty( "vacuum.bottom", "2000" ) );
     }
 
+    /** The FTDI relay board's serial port, or {@code auto} (default) to find it by name. */
+    public String getVacuumRelayPort() {
+        return props.getProperty("vacuum.relay.port", "auto");
+    }
+
+    /** Regular expression that recognises the relay board by its serial port name. */
+    public String getVacuumRelayMatch() {
+        return props.getProperty("vacuum.relay.match", nl.bytesoflife.mohican.VacuumPumpController.DEFAULT_RELAY_MATCH);
+    }
+
+    /** Milliseconds between two vacuum readings. */
+    public long getVacuumIntervalMs() {
+        return Long.parseLong(props.getProperty("vacuum.interval.ms", "2000"));
+    }
+
+    /** Readings missed in a row before the pump is switched off. */
+    public int getVacuumMissedMax() {
+        return Integer.parseInt(props.getProperty("vacuum.missed.max", "2"));
+    }
+
     /**
      * Origins the browser may drive this client from (CORS and the websocket).
      * <p>

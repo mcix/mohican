@@ -372,13 +372,37 @@ public class DeltaProtoDriver implements ErosController, Runnable {
         return d.intValue();
     }
 
+    /** The serial microPlacer's speed scale (the web page's slider), for pages that still send it. */
+    private static final int SERIAL_SPEED_MAX = 800;
+    /** The serial microPlacer's acceleration scale. */
+    private static final int SERIAL_ACC_MAX = 500;
+
+    /**
+     * 0-100 % of the velocity limit, like the legacy Mohican's slider. A value
+     * above 100 is taken to be on the serial boards' scale (the web page sent
+     * 10-800 here before it knew which driver it talked to) and mapped onto the
+     * percentage, so the slider's end is the legacy maximum; dropping it, as
+     * before, silently left the head at the 50 % start value.
+     */
     public void setSpeedInPercentage( Integer value ) {
-        if( 0 <= value && value <= 100 ) {
-            this.speed= value;
+        this.speed= percentage(value, SERIAL_SPEED_MAX, "speed");
+    }
+
+    private int percentage(Integer value, int serialMax, String what) {
+        if (value == null) {
+            logger.warn("No {} value", what);
+            return 50;
         }
-        else {
-            logger.warn("INVALID SPEED VALUE");
+        if (value > 100) {
+            final int mapped = Math.min(100, (int) Math.round(value * 100.0 / serialMax));
+            logger.warn("{} {} is on the serial scale (max {}), using {} %", what, value, serialMax, mapped);
+            return mapped;
         }
+        if (value < 0) {
+            logger.warn("{} {} is below zero, using 0 %", what, value);
+            return 0;
+        }
+        return value;
     }
 
     @Override
@@ -401,13 +425,9 @@ public class DeltaProtoDriver implements ErosController, Runnable {
         return version;
     }
 
+    /** 0-100 % of the acceleration limit; see {@link #setSpeedInPercentage}. */
     public void setAccelerationInPercentage( Integer value ) {
-        if( 0 <= value && value <= 100 ) {
-            this.acceleration= value;
-        }
-        else {
-            logger.warn("INVALID SPEED VALUE");
-        }
+        this.acceleration= percentage(value, SERIAL_ACC_MAX, "acceleration");
     }
 
     /**
