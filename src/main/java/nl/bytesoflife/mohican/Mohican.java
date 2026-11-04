@@ -624,6 +624,10 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         versions.put("logFile", logFile());
         versions.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version"));
         versions.put("user", System.getProperty("user.name"));
+        // Which machine this is, as chosen on the page (an id on the site's Machines page).
+        final Configuration cfg = Configuration.getInstance();
+        versions.put("machineId", cfg.getMachineId() == null ? "" : cfg.getMachineId());
+        versions.put("machineName", cfg.getMachineName() == null ? "" : cfg.getMachineName());
         sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).versions(versions).build());
     }
 
@@ -855,6 +859,25 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     break;
                 }
 
+                case "SET_MACHINE": {
+                    // The page's client info panel: {id, name} of this machine's entry on
+                    // the site, or null to forget it. Kept in configuration.properties so
+                    // every browser on this computer reports as the same machine.
+                    final Object v = action.getValue();
+                    String id = null, name = null;
+                    if (v instanceof Map) {
+                        final Object i = ((Map<?, ?>) v).get("id");
+                        final Object n = ((Map<?, ?>) v).get("name");
+                        id = i == null ? null : String.valueOf(i);
+                        name = n == null ? null : String.valueOf(n);
+                    }
+                    Configuration.getInstance().setMachine(id, name);
+                    logger.info("This machine is now '{}' ({})", name, id);
+                    final String label = name == null ? "Machine not chosen" : "Machine: " + name;
+                    withUi(ui -> ui.setTitleLabel(label));
+                    sendVersion();
+                    break;
+                }
                 case "SET_LOG_LEVEL": {
                     // The page's info panel: TRACE / DEBUG / INFO for our own
                     // packages (Spring stays where it is). Not persisted: the

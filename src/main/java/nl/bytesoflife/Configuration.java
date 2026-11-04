@@ -220,6 +220,57 @@ public class Configuration
         return props.getProperty( "tjardo.deltaproto.url", "http://www.deltaproto.com/intern/machine.php" );
     }
 
+    /** Which machine this computer drives: the id of its MOHICAN device on the site (Dashboard → Users → Machines), or null. */
+    public String getMachineId() {
+        final String v = props.getProperty("machine.id", "");
+        return v.trim().isEmpty() ? null : v.trim();
+    }
+
+    /** The device's name as it was when chosen, so the page can show it before the site answers. */
+    public String getMachineName() {
+        final String v = props.getProperty("machine.name", "");
+        return v.trim().isEmpty() ? null : v.trim();
+    }
+
+    /**
+     * Store which machine this is (chosen on the web page's client info panel), in
+     * configuration.properties, editing the two lines in place rather than
+     * Properties.store(), which would drop every comment in the machine's file.
+     */
+    public void setMachine(String id, String name) {
+        final java.util.Map<String, String> values = new java.util.LinkedHashMap<>();
+        values.put("machine.id", id == null ? "" : id.trim());
+        values.put("machine.name", name == null ? "" : name.trim());
+        try {
+            final java.io.File file = new java.io.File("configuration.properties");
+            final java.util.List<String> lines = file.exists()
+                    ? new java.util.ArrayList<>(java.nio.file.Files.readAllLines(file.toPath(), java.nio.charset.StandardCharsets.ISO_8859_1))
+                    : new java.util.ArrayList<>();
+            for (java.util.Map.Entry<String, String> e : values.entrySet()) {
+                final String line = e.getKey() + "=" + e.getValue();
+                boolean replaced = false;
+                for (int i = 0; i < lines.size(); i++) {
+                    final String t = lines.get(i).trim();
+                    if (t.startsWith(e.getKey() + "=") || t.startsWith(e.getKey() + " ") || t.startsWith("#" + e.getKey() + "=")) {
+                        if (!replaced) {
+                            lines.set(i, line);
+                            replaced = true;
+                        } else {
+                            lines.remove(i--);
+                        }
+                    }
+                }
+                if (!replaced) {
+                    lines.add(line);
+                }
+            }
+            java.nio.file.Files.write(file.toPath(), lines, java.nio.charset.StandardCharsets.ISO_8859_1);
+            INSTANCE = null;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public String getTeknicPort() {
         return props.getProperty( "teknic.port", null );
     }
