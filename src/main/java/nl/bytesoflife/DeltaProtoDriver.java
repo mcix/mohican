@@ -84,6 +84,19 @@ public class DeltaProtoDriver implements ErosController, Runnable {
     private native void closePort( long pointer );
     private native void moveTo( long pointer, int x, int y, int acc, int vel, int release);
     private native void release( long pointer, int release);
+    /*
+     * The same move and release, returning the driver's report: per axis the
+     * estimated and actual duration, how the end of the move was seen (the
+     * MoveDone edge or its level), and the Enabled bit read back after the
+     * release. A DLL from before November 2026 does not have these; the void
+     * variants above are used then (see {@link #reporting}).
+     */
+    private native String moveToReport( long pointer, int x, int y, int acc, int vel, int release);
+    private native String releaseReport( long pointer, int release);
+    /** "ClearPath-SC fw 1.0.2 E113 ... serial 123" of node 0 (X) or 1 (Y). */
+    private native String nodeInfo( long pointer, int index );
+    /** The live status register of node 0 (X) or 1 (Y): "enabled=1 moveDone=1 ...". */
+    private native String nodeStatus( long pointer, int index );
     private native double getPositionX( long pointer );
     private native double getPositionY( long pointer );
     private native int getMaxAcc( long pointer );
@@ -111,6 +124,19 @@ public class DeltaProtoDriver implements ErosController, Runnable {
     private volatile boolean ready = false;
     private volatile int pollFailures = 0;
     private volatile Runnable onLost = null;
+
+    /** Whether the DLL on this machine has the reporting entry points; null until first tried. */
+    private volatile Boolean reporting = null;
+    /** Firmware, model and serial of the two nodes, read once after homing. */
+    private volatile String nodeInfoX = "unknown";
+    private volatile String nodeInfoY = "unknown";
+    /** Moves since the hub opened, and how many of them ended in a failure or a node that stayed enabled. */
+    private final java.util.concurrent.atomic.AtomicInteger moves = new java.util.concurrent.atomic.AtomicInteger();
+    private final java.util.concurrent.atomic.AtomicInteger failedMoves = new java.util.concurrent.atomic.AtomicInteger();
+    private volatile String lastMoveReport = "";
+    /** The position the poll last logged at DEBUG, and when, so a moving head is logged once a second, not twenty times. */
+    private int loggedX = Integer.MIN_VALUE, loggedY = Integer.MIN_VALUE;
+    private long loggedAt = 0;
 
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
         final Thread t = new Thread(r, "teknic-position");
@@ -201,6 +227,7 @@ public class DeltaProtoDriver implements ErosController, Runnable {
             throw new IllegalStateException("Teknic hub failed to initialise: " + t, t);
         }
         logger.info("Teknic hub open: acc {}..{} vel {}..{}", minAcc, maxAcc, minVel, maxVel);
+        readNodeInfo();
 
         encoderListenerX.newPos( 0 );
         encoderListenerY.newPos( 0 );
@@ -265,19 +292,138 @@ public class DeltaProtoDriver implements ErosController, Runnable {
     }
 
     public void goTo(Integer posX, Integer posY) {
-
-        //encoderListenerX.newPos( posX - pcbZeroX );
-        //encoderListenerY.newPos( posY - pcbZeroY );
-
-        moveTo(p, posX, posY, getAccByPercentage(acceleration), getVelByPercentage(speed), TRUE);
+        move("goTo", posX, posY, getAccByPercentage(acceleration), getVelByPercentage(speed));
     }
 
     public void goToPcb(Integer posX, Integer posY) {
+        move("goToPcb", pcbZeroX + posX, pcbZeroY + posY, getAccByPercentage(acceleration), getVelByPercentage(speed));
+    }
 
-        //encoderListenerX.newPos( posX );
-        //encoderListenerY.newPos( posY );
+    /**
+     * Every move goes through here. The native call is synchronous: it starts
+     * both axes, waits for both to report Move Done and then disables both
+     * (the "release" the operator expects, so the head can be moved by hand).
+     * What is logged, so a day of use can be read back:
+     * <ul>
+     * <li>INFO one line per move: target, speed, how long it took, the outcome;</li>
+     * <li>DEBUG the driver's report (per axis: estimate, actual, edge/level, enabled bit after release);</li>
+     * <li>WARN when the move failed or a node reads enabled after the release, with the report.</li>
+     * </ul>
+     * When the move failed, the release is tried once more from here, because
+     * the DLLs from before November 2026 skip it when the wait timed out, and
+     * that is exactly how the motors stayed "in brake".
+     */
+    private void move(String what, int x, int y, int acc, int vel) {
+        final int n = moves.incrementAndGet();
+        final double fromX = positionOrNaN(true), fromY = positionOrNaN(false);
+        final long t0 = System.nanoTime();
+        logger.info("move #{} {} to ({}, {}) from ({}, {}) acc {} vel {} speed {}% accel {}%", n, what, x, y,
+                fmt(fromX), fmt(fromY), acc, vel, speed, acceleration);
+        String report = null;
+        try {
+            report = reportingMove(x, y, acc, vel);
+            lastMoveReport = report == null ? "" : report;
+            final long ms = (System.nanoTime() - t0) / 1_000_000;
+            if (report != null && report.contains("STILL ENABLED")) {
+                failedMoves.incrementAndGet();
+                logger.warn("move #{} done in {} ms but a node stayed enabled:\n{}", n, ms, report);
+            } else {
+                logger.info("move #{} done in {} ms, now at ({}, {})", n, ms, fmt(positionOrNaN(true)), fmt(positionOrNaN(false)));
+                if (report != null) {
+                    logger.debug("move #{} report:\n{}", n, report);
+                }
+            }
+        } catch (Throwable t) {
+            failedMoves.incrementAndGet();
+            final long ms = (System.nanoTime() - t0) / 1_000_000;
+            lastMoveReport = "FAILED: " + t.getMessage();
+            logger.warn("move #{} FAILED after {} ms, now at ({}, {}): {}", n, ms, fmt(positionOrNaN(true)), fmt(positionOrNaN(false)), t.toString());
+            releaseAfterFailure(n);
+            throw t;
+        }
+    }
 
-        moveTo(p, pcbZeroX + posX, pcbZeroY + posY, getAccByPercentage(acceleration), getVelByPercentage(speed), TRUE);
+    /** The reporting native when the DLL has it, else the old one (no report). */
+    private String reportingMove(int x, int y, int acc, int vel) {
+        if (!Boolean.FALSE.equals(reporting)) {
+            try {
+                final String r = moveToReport(p, x, y, acc, vel, TRUE);
+                reporting = true;
+                return r;
+            } catch (UnsatisfiedLinkError e) {
+                reporting = false;
+                logger.warn("deltateknic.dll on this machine has no move report (older build); moves are logged without it");
+            }
+        }
+        moveTo(p, x, y, acc, vel, TRUE);
+        return null;
+    }
+
+    private void releaseAfterFailure(int n) {
+        try {
+            final String r = reportingRelease();
+            logger.warn("move #{}: released the motors after the failure{}", n, r == null ? "" : ":\n" + r);
+        } catch (Throwable t) {
+            logger.error("move #{}: releasing the motors after the failure failed too: {}", n, t.toString());
+        }
+    }
+
+    private String reportingRelease() {
+        if (!Boolean.FALSE.equals(reporting)) {
+            try {
+                final String r = releaseReport(p, TRUE);
+                reporting = true;
+                return r;
+            } catch (UnsatisfiedLinkError e) {
+                reporting = false;
+            }
+        }
+        release(p, TRUE);
+        return null;
+    }
+
+    private double positionOrNaN(boolean x) {
+        try {
+            return x ? getPositionX(p) : getPositionY(p);
+        } catch (Throwable t) {
+            return Double.NaN;
+        }
+    }
+
+    private static String fmt(double v) {
+        return Double.isNaN(v) ? "?" : String.valueOf((int) v);
+    }
+
+    private void readNodeInfo() {
+        try {
+            nodeInfoX = nodeInfo(p, 0);
+            nodeInfoY = nodeInfo(p, 1);
+            reporting = true;
+            logger.info("Teknic X: {}", nodeInfoX);
+            logger.info("Teknic Y: {}", nodeInfoY);
+        } catch (UnsatisfiedLinkError e) {
+            reporting = false;
+            nodeInfoX = nodeInfoY = "unknown (deltateknic.dll from before November 2026, no node info)";
+            logger.warn("deltateknic.dll on this machine is an older build: no node info, no move report");
+        } catch (Throwable t) {
+            nodeInfoX = nodeInfoY = "unknown (" + t.getMessage() + ")";
+            logger.warn("Reading the Teknic node info failed: {}", t.toString());
+        }
+    }
+
+    /** The live status of both nodes, for the log and the info panel; null with an older DLL. */
+    public String status() {
+        if (Boolean.FALSE.equals(reporting) || p == 0) {
+            return null;
+        }
+        try {
+            return "X " + nodeStatus(p, 0) + " | Y " + nodeStatus(p, 1);
+        } catch (UnsatisfiedLinkError e) {
+            reporting = false;
+            return null;
+        } catch (Throwable t) {
+            return "status failed: " + t.getMessage();
+        }
     }
 
     public void goTo(final Integer posX, final Integer posY, final Integer delayX, final Integer delayY) {
@@ -294,7 +440,7 @@ public class DeltaProtoDriver implements ErosController, Runnable {
                     else {
                         sleep(delayY);
                     }
-                    moveTo(p, pcbZeroX + posX, pcbZeroY + posY, getAccByPercentage(acceleration), getVelByPercentage(speed), TRUE);
+                    move("goTo delayed", pcbZeroX + posX, pcbZeroY + posY, getAccByPercentage(acceleration), getVelByPercentage(speed));
                 }
                 catch( InterruptedException e )
                 {
@@ -309,8 +455,16 @@ public class DeltaProtoDriver implements ErosController, Runnable {
         encoderListenerY.newPos( posY );
     }
 
+    /** The BRAKE false command (ESC / Release on the page): disable both nodes. */
     public void disableBrake() {
-        release(p, TRUE);
+        final long t0 = System.nanoTime();
+        try {
+            final String r = reportingRelease();
+            logger.info("release in {} ms{}", (System.nanoTime() - t0) / 1_000_000, r == null ? "" : ":\n" + r);
+        } catch (Throwable t) {
+            logger.warn("release FAILED: {}", t.toString());
+            throw t;
+        }
     }
 
     @Override
@@ -330,7 +484,7 @@ public class DeltaProtoDriver implements ErosController, Runnable {
         encoderListenerX.newPos( currentx - pcbZeroX );
         encoderListenerY.newPos( currenty - pcbZeroY );
 
-        moveTo(p, currentx, currenty + i, minAcc, minVel, TRUE);
+        move("moveY", currentx, currenty + i, minAcc, minVel);
     }
 
     public void moveX(int i) {
@@ -345,7 +499,7 @@ public class DeltaProtoDriver implements ErosController, Runnable {
         encoderListenerX.newPos( currentx - pcbZeroX );
         encoderListenerY.newPos( currenty - pcbZeroY );
 
-        moveTo(p, currentx + i, currenty, minAcc, minVel, TRUE);
+        move("moveX", currentx + i, currenty, minAcc, minVel);
     }
 
     public void setUpdateSpeed(int updateSpeed) {
@@ -422,12 +576,45 @@ public class DeltaProtoDriver implements ErosController, Runnable {
         final Map<String, String> version = new HashMap<>();
         version.put("driver", "teknic");
         version.put("port", "COM" + port);
+        version.put("firmwareX", nodeInfoX);
+        version.put("firmwareY", nodeInfoY);
+        version.put("nativeLibrary", reporting == null ? "deltateknic.dll (not yet used)"
+                : reporting ? "deltateknic.dll with move reports (November 2026 or later)"
+                : "deltateknic.dll older build: no move reports, no node info");
+        version.put("limits", "acc " + minAcc + ".." + maxAcc + " RPM/s, vel " + minVel + ".." + maxVel + " RPM");
+        version.put("moves", moves.get() + " since the hub opened, " + failedMoves.get() + " failed");
+        version.put("lastMove", lastMoveReport);
+        final String status = status();
+        if (status != null) {
+            version.put("status", status);
+        }
         return version;
     }
 
     /** 0-100 % of the acceleration limit; see {@link #setSpeedInPercentage}. */
     public void setAccelerationInPercentage( Integer value ) {
         this.acceleration= percentage(value, SERIAL_ACC_MAX, "acceleration");
+    }
+
+    /**
+     * At DEBUG: the position whenever it changed, at most once a second, so a
+     * head that moves while nothing was commanded (or does not move when it
+     * was) shows up in a day's log without flooding it. At TRACE: every poll.
+     */
+    private void logPosition(int x, int y) {
+        if (logger.isTraceEnabled()) {
+            logger.trace("poll ({}, {})", x, y);
+        }
+        if (!logger.isDebugEnabled()) {
+            return;
+        }
+        final long now = System.currentTimeMillis();
+        if ((x != loggedX || y != loggedY) && now - loggedAt >= 1000) {
+            logger.debug("position ({}, {})", x, y);
+            loggedX = x;
+            loggedY = y;
+            loggedAt = now;
+        }
     }
 
     /**
@@ -448,6 +635,7 @@ public class DeltaProtoDriver implements ErosController, Runnable {
             encoderListenerX.newPos( x );
             encoderListenerY.newPos( y );
             pollFailures = 0;
+            logPosition(x, y);
         } catch (Throwable t) {
             pollFailures++;
             if (pollFailures == 1) {

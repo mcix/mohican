@@ -611,6 +611,50 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
         return message == null || message.isEmpty() ? cause.getClass().getSimpleName() : message;
     }
 
+    /** The packages whose level the page may switch; the native driver's lines are in nl.bytesoflife. */
+    private static final String OUR_LOGGER = "nl.bytesoflife";
+
+    private void sendVersion() {
+        String javaVersion = System.getProperty("java.version");
+        Map<String, String> versions = new HashMap<>(erosController.getVersion());
+        versions.put("driver", motorDriver);
+        versions.put("motorStatus", motorStatus);
+        versions.put("motorReady", String.valueOf(motorReady));
+        versions.put("logLevel", logLevel());
+        versions.put("logFile", logFile());
+        versions.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version"));
+        versions.put("user", System.getProperty("user.name"));
+        sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).versions(versions).build());
+    }
+
+    private static String logLevel() {
+        final org.slf4j.Logger l = LoggerFactory.getLogger(OUR_LOGGER);
+        if (l instanceof ch.qos.logback.classic.Logger) {
+            return ((ch.qos.logback.classic.Logger) l).getEffectiveLevel().toString();
+        }
+        return l.isTraceEnabled() ? "TRACE" : l.isDebugEnabled() ? "DEBUG" : "INFO";
+    }
+
+    private static void setLogLevel(String level) {
+        final org.slf4j.Logger l = LoggerFactory.getLogger(OUR_LOGGER);
+        if (!(l instanceof ch.qos.logback.classic.Logger)) {
+            logger.warn("Cannot change the log level: not logback");
+            return;
+        }
+        final ch.qos.logback.classic.Level lv = ch.qos.logback.classic.Level.toLevel(level == null ? "INFO" : level.trim().toUpperCase(), ch.qos.logback.classic.Level.INFO);
+        ((ch.qos.logback.classic.Logger) l).setLevel(lv);
+        logger.info("Log level of {} set to {}", OUR_LOGGER, lv);
+    }
+
+    /** Where this client writes its log (logging.file.name in application.properties), for the info panel. */
+    private String logFile() {
+        final String f = System.getProperty("LOG_FILE");
+        if (f != null) {
+            return f;
+        }
+        return System.getProperty("user.home") + java.io.File.separator + "mohican" + java.io.File.separator + "mohican.log";
+    }
+
     private void setMotorStatus(String driver, String status, boolean ready) {
         motorDriver = driver;
         motorStatus = status;
@@ -811,13 +855,16 @@ public class Mohican implements ReduxEventListener, WebsocketProviderListener, I
                     break;
                 }
 
+                case "SET_LOG_LEVEL": {
+                    // The page's info panel: TRACE / DEBUG / INFO for our own
+                    // packages (Spring stays where it is). Not persisted: the
+                    // client starts at INFO again.
+                    setLogLevel(String.valueOf(action.getValue()));
+                    sendVersion();
+                    break;
+                }
                 case "GET_VERSION": {
-                    String javaVersion = System.getProperty("java.version");
-                    Map<String, String> versions = new HashMap<>(erosController.getVersion());
-                    versions.put("driver", motorDriver);
-                    versions.put("motorStatus", motorStatus);
-                    versions.put("motorReady", String.valueOf(motorReady));
-                    sendMessage("MOHICAN_CLIENT_VERSION", VersionMessage.builder().javaVersion(javaVersion).version(version).versions(versions).build());
+                    sendVersion();
                     // The web client asks for the version right after connecting;
                     // give it the motor state at the same moment.
                     sendMessage("MOHICAN_MOTOR_STATUS", MotorStatus.builder().driver(motorDriver).status(motorStatus).ready(motorReady).build());
