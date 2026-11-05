@@ -10,7 +10,9 @@ public class SimpleSerialPort2 {
 
     public SimpleSerialPort2(String port, int baudrate) {
         serialPort= SerialPort.getCommPort(port);
-        serialPort.openPort();//Open serial port
+        if (!serialPort.openPort()) {
+            throw new IllegalStateException(port + " could not be opened (in use by another program?)");
+        }
         serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 100, 0);
         //serialPort.purgePort(0);
         //serialPort.setParams(baudrate, 8, 1, 0);//Set params.

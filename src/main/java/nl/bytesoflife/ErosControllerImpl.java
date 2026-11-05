@@ -4,6 +4,8 @@ import jssc.SerialNativeInterface;
 import jssc.SerialPortList;
 import nl.bytesoflife.mohican.Mohican;
 import nl.bytesoflife.mohican.Mohican.Position;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -16,6 +18,8 @@ import java.util.stream.Collectors;
 import static java.lang.Thread.sleep;
 
 public class ErosControllerImpl implements ErosController {
+    private static final Logger logger = LoggerFactory.getLogger(ErosControllerImpl.class);
+
     private EncoderListener encoderListenerX= null;
     private EncoderListener encoderListenerY= null;
 
@@ -159,7 +163,7 @@ public class ErosControllerImpl implements ErosController {
 
                 motor.start();
             } catch (Exception e) {
-
+                logger.warn("Could not probe {}", port, e);
             }
 
         }

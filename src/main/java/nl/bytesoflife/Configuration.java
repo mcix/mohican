@@ -14,29 +14,34 @@ public class Configuration
     private static Configuration INSTANCE = new Configuration();
     private Properties props;
 
+    /**
+     * The bundled configuration.properties gives the defaults; a configuration.properties
+     * in the working directory overrides them key by key. The local file used to replace
+     * the defaults whole, so one holding only machine.id / machine.name (written by
+     * setMachine() when there was no local file) left motor.speed unset and the serial
+     * probe failed on every port.
+     */
     public Configuration()
     {
-        try
+        props= new Properties();
+        try (InputStream inputStream = Configuration.class.getResourceAsStream("/configuration.properties"))
         {
-            FileInputStream input = new FileInputStream("configuration.properties");
+            if (inputStream != null) {
+                props.load(inputStream);
+            }
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
 
-            props= new Properties();
+        try (FileInputStream input = new FileInputStream("configuration.properties"))
+        {
             props.load(input);
         }
         catch (FileNotFoundException e)
         {
-
-            try {
-                InputStream inputStream = Configuration.class.getResourceAsStream("/configuration.properties");
-                props= new Properties();
-                props.load(inputStream);
-            } catch (FileNotFoundException e2) {
-                e2.printStackTrace();
-            } catch (IOException e2) {
-                e2.printStackTrace();
-            }
-
-            e.printStackTrace();
+            // No local file: the bundled defaults are the whole configuration.
         }
         catch (IOException e)
         {
